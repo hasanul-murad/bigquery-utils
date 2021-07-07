@@ -11,12 +11,12 @@ pipeline {
         }
         stage('unit_tests') {
             steps {
-                sh 'cd tools/cloud_functions/gcs_event_based_ingest/ && venv/bin/python3 -m pytest tests -m "not IT"'
+                sh 'cd tools/cloud_functions/gcs_event_based_ingest/ && ${VIRTUAL_ENV}/bin/python3 -m pytest tests -m "not IT"'
             }
         }
         stage('integration_tests') {
             steps {
-                sh 'cd tools/cloud_functions/gcs_event_based_ingest/ && venv/bin/python3 -m pytest tests -m IT'
+                sh 'cd tools/cloud_functions/gcs_event_based_ingest/ && ${VIRTUAL_ENV}/bin/python3 -m pytest tests -m IT'
             }
         }
     }
