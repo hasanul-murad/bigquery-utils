@@ -74,9 +74,13 @@ def external_query(  # pylint: disable=too-many-arguments
             dict(message="Found external table definition.",
                  table=table.to_api_repr(),
                  external_table_def=external_table_def)))
+    # Reduce the amount of sourceUris by using wildcards with common
+    # prefixes. This is done to keep the cloud logging audit metadata
+    # below 100k in size, otherwise the metadata is omitted in the event.
+    source_uris_with_wildcards = compact_source_uris_with_wildcards(
+        flatten2dlist(get_batches_for_gsurl(gcs_client, gsurl)))
     # This may cause an issue if >10,000 files.
-    external_table_def["sourceUris"] = flatten2dlist(
-        get_batches_for_gsurl(gcs_client, gsurl))
+    external_table_def["sourceUris"] = source_uris_with_wildcards
     # Check if hivePartitioningOptions
     # https://cloud.google.com/bigquery/docs/reference/rest/v2/tables#hivepartitioningoptions
     # is set in external.json file
@@ -117,6 +121,23 @@ def external_query(  # pylint: disable=too-many-arguments
             time.sleep(constants.JOB_POLL_INTERVAL_SECONDS)
 
 
+def compact_source_uris_with_wildcards(source_uris: List[str]):
+    """Given a list of source URIs, combine URIs using common prefixes and wildcards.
+
+    For example, given the following list:
+      ["gs://bucket/batch/file1.csv", "gs://bucket/batch/file2.csv", "gs://bucket/batch/file3.csv"]
+
+    Return the following list:
+      ["gs://bucket/batch/*.csv"]
+    """
+    source_uris_with_wildcards = set()
+    for source_uri in source_uris:
+        source_uris_with_wildcards.add(
+            f"{'/'.join(source_uri.split('/')[:-1])}/*.{source_uri.split('.')[-1]}"
+        )
+    return list(source_uris_with_wildcards)
+
+
 def get_hive_partitioning_source_uri_prefix(gcs_uri: str):
     """Given a gcs uri, parse out the hive partitioning source uri prefix
 
@@ -125,7 +146,7 @@ def get_hive_partitioning_source_uri_prefix(gcs_uri: str):
     In short, it will return the gcs uri prefix that comes before any path element which
     contains a key,value pair (equal sign between two words).
     """
-    source_uri_prefix_regex = r'^(?P<sourceUriPrefix>gs://.*?)/[\w\-]+=[\w\-]*/[\w\-]+'
+    source_uri_prefix_regex = r'^(?P<sourceUriPrefix>gs://.*?)/[\w\-]+=[\w\-]*/[\w\-\*]+'
     match = re.compile(source_uri_prefix_regex).match(gcs_uri)
     if not match:
         raise exceptions.HiveSourceUriPrefixRegexMatchException(
