@@ -1,5 +1,8 @@
 pipeline {
-    agent { any { image 'python:3.8.0' } }
+    agent { docker { image 'python:3.8.0' } }
+    environment {
+        GOOGLE_APPLICATION_CREDENTIALS = credentials('service_acct')
+    }
     stages {
         stage('install_requirements') {
             steps {
@@ -10,12 +13,12 @@ pipeline {
         }
         stage('unit_tests') {
             steps {
-                sh 'source venv/bin/activate && cd tools/cloud_functions/gcs_event_based_ingest/ && python3 -m pytest tests -m "not IT"'
+                sh '. venv/bin/activate && cd tools/cloud_functions/gcs_event_based_ingest/ && python3 -m pytest tests -m "not IT"'
             }
         }
         stage('integration_tests') {
             steps {
-                sh 'source venv/bin/activate && cd tools/cloud_functions/gcs_event_based_ingest/ && python3 -m pytest tests -m IT'
+                sh '. venv/bin/activate && cd tools/cloud_functions/gcs_event_based_ingest/ && python3 -m pytest tests -m IT'
             }
         }
     }
