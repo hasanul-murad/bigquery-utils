@@ -6,9 +6,9 @@ pipeline {
     stages {
         stage('install_requirements') {
             steps {
-                sh 'python3 -m venv venv'
-                sh 'venv/bin/python3 -m pip install --upgrade pip'
-                sh 'venv/bin/python3 -m pip install -r tools/cloud_functions/gcs_event_based_ingest/requirements-dev.txt'
+                sh 'python -m venv venv'
+                sh 'venv/bin/python -m pip install --upgrade pip'
+                sh 'venv/bin/python -m pip install -r tools/cloud_functions/gcs_event_based_ingest/requirements-dev.txt'
             }
         }
         stage('unit_tests') {
