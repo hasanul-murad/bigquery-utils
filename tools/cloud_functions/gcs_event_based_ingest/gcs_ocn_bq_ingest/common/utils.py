@@ -862,10 +862,9 @@ def gcs_path_to_load_config_and_datasource_name(
         year, month, day, hour = (f'{int(destination_details.get(key, "")):02}'
                                   if destination_details.get(key) else ""
                                   for key in ('yyyy', 'mm', 'dd', 'hh'))
-        # If hour is not provided, default to 00
-        part_list = (year, month, day, hour or '00')
+        part_list = (year, month, day, hour)
         if not partition and any(part_list):
-            partition = '$' + ''.join(part_list)
+            partition = '$' + ''.join(filter(None, part_list))
         batch_id = destination_details.get('batch')
         labels = constants.DEFAULT_JOB_LABELS
 
