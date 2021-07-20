@@ -1,3 +1,4 @@
+config { hasOutput: true }
 CREATE OR REPLACE TABLE ${dataform.projectConfig.defaultSchema}.population_by_zip_2000
 (
   zipcode STRING NOT NULL OPTIONS(description="Five digit ZIP Code Tabulation Area Census Code"),

@@ -1,0 +1,5 @@
+config {
+    type: "view"
+}
+SELECT *
+FROM ${ref("population_by_zip_2010")}
