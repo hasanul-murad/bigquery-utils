@@ -290,3 +290,23 @@ def test_create_job_id_with_datasource_name_and_partition_missing_hour():
         "bucket/source/dataset/table/2021/06/22/_SUCCESS", "source", table)
     job_id = '-'.join(job_id.split('-')[0:8])
     assert job_id == 'gcf-ingest-source-dataset-table-2021-06-22'
+
+
+def test_compact_source_uris_with_wildcards():
+    long_uris = [
+        "gs://bucket/batch/file1.csv", "gs://bucket/batch/file2.csv",
+        "gs://bucket/batch/file3.csv"
+    ]
+    source_uris = gcs_ocn_bq_ingest.common.utils.compact_source_uris_with_wildcards(
+        long_uris)
+    assert source_uris == ["gs://bucket/batch/*.csv"]
+
+
+def test_compact_source_uris_with_wildcards_no_file_extension():
+    long_uris_no_extension = [
+        "gs://bucket/batch/file1", "gs://bucket/batch/file2",
+        "gs://bucket/batch/file3"
+    ]
+    source_uris = gcs_ocn_bq_ingest.common.utils.compact_source_uris_with_wildcards(
+        long_uris_no_extension)
+    assert source_uris == ["gs://bucket/batch/*"]

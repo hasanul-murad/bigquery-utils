@@ -132,9 +132,14 @@ def compact_source_uris_with_wildcards(source_uris: List[str]):
     """
     source_uris_with_wildcards = set()
     for source_uri in source_uris:
-        source_uris_with_wildcards.add(
-            f"{'/'.join(source_uri.split('/')[:-1])}/*.{source_uri.split('.')[-1]}"
-        )
+        file_name = os.path.basename(source_uri)
+        if len(file_name.split('.')) > 1:
+            # If file extension is present, use it with a wildcard
+            # (e.g. *.csv)
+            source_uris_with_wildcards.add(
+                f"{os.path.dirname(source_uri)}/*.{file_name.split('.')[-1]}")
+        else:
+            source_uris_with_wildcards.add(f"{os.path.dirname(source_uri)}/*")
     return list(source_uris_with_wildcards)
 
 
