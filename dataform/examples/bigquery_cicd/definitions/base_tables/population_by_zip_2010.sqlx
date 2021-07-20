@@ -10,4 +10,6 @@ CREATE OR REPLACE TABLE ${dataform.projectConfig.defaultSchema}.population_by_zi
 )
 OPTIONS(
   labels=[("freebqcovid", "")]
-);
+) AS
+SELECT *
+FROM bigquery-public-data.census_bureau_usa.population_by_zip_2010

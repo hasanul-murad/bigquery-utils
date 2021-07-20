@@ -1,0 +1,16 @@
+config { type: "table" }
+
+SELECT
+  year,
+  zipcode,
+  SUM(population) AS population
+FROM (
+  SELECT zipcode, population, 2000 AS year FROM
+  ${ref("population_by_zip_2000")}
+  UNION ALL
+  SELECT zipcode, population, 2010 AS year FROM
+    ${ref("population_by_zip_2010")}
+)
+GROUP BY 1,2
+ORDER BY population DESC
+LIMIT 10
