@@ -139,7 +139,10 @@ def compact_source_uris_with_wildcards(source_uris: List[str]):
             source_uris_with_wildcards.add(
                 f"{os.path.dirname(source_uri)}/*.{file_name.split('.')[-1]}")
         else:
-            source_uris_with_wildcards.add(f"{os.path.dirname(source_uri)}/*")
+            # If no file extension is present, just add the source_uri
+            # as-is in order to avoid picking up other control files
+            # (e.g. _SUCCESS) or empty files.
+            source_uris_with_wildcards.add(source_uri)
     return list(source_uris_with_wildcards)
 
 
