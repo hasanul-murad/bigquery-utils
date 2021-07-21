@@ -7,6 +7,9 @@ cleanup() {
 }
 
 dataform install
+# Create an .df-credentials.json file as shown below
+# in order to have Dataform pick up application default credentials
+# https://cloud.google.com/docs/authentication/production#automatically
 echo '{"projectId": "", "location": "US"}' > .df-credentials.json
 dataform run
 
