@@ -10,10 +10,12 @@ cleanup() {
 handle_new_ddls(){
   local updated_ddls_dir
   updated_ddls_dir=$1
+  local new_columns
+  new_columns = $2
   local sql_files
   sql_files=$(find "${updated_ddls_dir}" -type f -name "*.sql")
   local new_ddl_select
-  new_ddl_select="AS SELECT *, 'default value' AS new_col FROM \${self()}"
+  new_ddl_select="AS SELECT *, ${new_columns} FROM \${self()}"
   while read -r file; do
     sed -i '' "s|;| ${new_ddl_select}|g" "${file}"
   done <<<"${sql_files}"
@@ -25,7 +27,7 @@ dataform install
 # in order to have Dataform pick up application default credentials
 # https://cloud.google.com/docs/authentication/production#automatically
 echo '{"projectId": "", "location": "US"}' > .df-credentials.json
-handle_new_ddls updated_ddls
+handle_new_ddls updated_ddls " 'default value' AS new_col "
 dataform run
 
 # Cleaning only necessary when running locally

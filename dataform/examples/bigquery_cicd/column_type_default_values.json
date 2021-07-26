@@ -1,0 +1,13 @@
+{
+    "default_column_type_map":
+    [
+        {
+            "type": "STRING",
+            "default_value": "this is default"
+        },
+        {
+            "type": "NUMERIC",
+            "default_value": 0.0
+        }
+    ]
+}
