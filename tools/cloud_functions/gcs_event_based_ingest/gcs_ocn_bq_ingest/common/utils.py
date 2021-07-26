@@ -918,22 +918,30 @@ def create_job_id(success_file_path, data_source_name=None, table=None):
     Note, gcf-ingest- can be overridden with environment variable JOB_PREFIX
     3. uuid for uniqueness
     """
-    if data_source_name and table and len(table.table_id.split('$')) == 2:
-        # This code is reached if the user has set an explicit load_data_source
-        # key,value pair in the BQ_LOAD_CONFIG_FILENAME file and the GCS path has
-        # partition information.
-        partition_info = table.table_id.split('$')[1]
-        clean_job_id = (f'{data_source_name}/'
-                        f'{table.dataset_id}/'
-                        f'{table.table_id.split("$")[0]}/')
-        if len(partition_info) >= 4:
-            clean_job_id += f'{partition_info[0:4]}/'
-        if len(partition_info) >= 6:
-            clean_job_id += f'{partition_info[4:6]}/'
-        if len(partition_info) >= 8:
-            clean_job_id += f'{partition_info[6:8]}/'
-        if len(partition_info) == 10:
-            clean_job_id += f'{partition_info[8:10]}/'
+    if data_source_name and table:
+        if len(table.table_id.split('$')) == 2:
+            # This code is reached if the user has set an explicit load_data_source
+            # key,value pair in the BQ_LOAD_CONFIG_FILENAME file and the GCS path has
+            # partition information.
+            partition_info = table.table_id.split('$')[1]
+            clean_job_id = (f'{data_source_name}/'
+                            f'{table.dataset_id}/'
+                            f'{table.table_id.split("$")[0]}/')
+            if len(partition_info) >= 4:
+                clean_job_id += f'{partition_info[0:4]}/'
+            if len(partition_info) >= 6:
+                clean_job_id += f'{partition_info[4:6]}/'
+            if len(partition_info) >= 8:
+                clean_job_id += f'{partition_info[6:8]}/'
+            if len(partition_info) == 10:
+                clean_job_id += f'{partition_info[8:10]}/'
+        else:
+            # This code is reached if the user has set an explicit load_data_source
+            # key,value pair in the BQ_LOAD_CONFIG_FILENAME file but the GCS path
+            # and regex does NOT have any partition information.
+            clean_job_id = (f'{data_source_name}/'
+                            f'{table.dataset_id}/'
+                            f'{table.table_id}/')
         clean_job_id = clean_job_id.replace('-',
                                             '_').replace('/',
                                                          '-').replace('$', '')

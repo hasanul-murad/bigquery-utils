@@ -293,6 +293,14 @@ def test_create_job_id_with_datasource_name_and_partition_missing_hour():
     assert job_id == 'gcf-ingest-source-dataset-table-2021-06-22'
 
 
+def test_create_job_id_with_datasource_name_and_no_partition():
+    table = bigquery.Table.from_string("project.dataset.table")
+    job_id = gcs_ocn_bq_ingest.common.utils.create_job_id(
+        "bucket/source/dataset/table/_SUCCESS", "source", table)
+    job_id = '-'.join(job_id.split('-')[0:5])
+    assert job_id == 'gcf-ingest-source-dataset-table'
+
+
 def test_compact_source_uris_with_wildcards():
     long_uris = [
         "gs://bucket/batch/file1.csv", "gs://bucket/batch/file2.csv",
