@@ -7,7 +7,8 @@ cleanup() {
  rm -rf node_modules
  rm -f package-lock.json
  rm -f .df-credentials.json
-# bq rm -r -f --dataset dataform
+ bq rm -r -f --dataset dataform
+ rm -rf definitions/ddl_scale_test
 }
 
 handle_new_ddls(){
@@ -24,8 +25,10 @@ handle_new_ddls(){
   done <<<"${sql_files}"
 }
 
-bq rm -r -f --dataset dataform
-rm -rf definitions/ddl_scale_test
+# Cleaning only necessary when running locally to simulate
+# runtimes of real builds that start from scratch.
+cleanup
+
 python3 generate_ddls.py
 dataform install
 # Create an .df-credentials.json file as shown below
@@ -35,5 +38,3 @@ echo "{\"projectId\": \"${PROJECT_ID}\", \"location\": \"${BQ_LOCATION}\"}" > .d
 handle_new_ddls updated_ddls " 'default value' AS new_col "
 dataform run
 
-# Cleaning only necessary when running locally
-cleanup
