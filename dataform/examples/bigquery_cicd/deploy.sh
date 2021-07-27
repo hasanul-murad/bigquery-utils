@@ -1,5 +1,8 @@
 #!/bin/bash
 
+PROJECT_ID=danny-bq
+BQ_LOCATION=US
+
 cleanup() {
  rm -rf node_modules
  rm -f package-lock.json
@@ -11,7 +14,7 @@ handle_new_ddls(){
   local updated_ddls_dir
   updated_ddls_dir=$1
   local new_columns
-  new_columns = $2
+  new_columns=$2
   local sql_files
   sql_files=$(find "${updated_ddls_dir}" -type f -name "*.sql")
   local new_ddl_select
@@ -22,11 +25,13 @@ handle_new_ddls(){
 }
 
 bq rm -r -f --dataset dataform
+rm -rf definitions/ddl_scale_test
+python3 generate_ddls.py
 dataform install
 # Create an .df-credentials.json file as shown below
 # in order to have Dataform pick up application default credentials
 # https://cloud.google.com/docs/authentication/production#automatically
-echo '{"projectId": "", "location": "US"}' > .df-credentials.json
+echo "{\"projectId\": \"${PROJECT_ID}\", \"location\": \"${BQ_LOCATION}\"}" > .df-credentials.json
 handle_new_ddls updated_ddls " 'default value' AS new_col "
 dataform run
 
