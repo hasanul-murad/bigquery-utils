@@ -37,4 +37,4 @@ FROM bigquery-public-data.census_bureau_usa.population_by_zip_2000;
 --   -- the semicolon with it.
 --   AS
 --   SELECT *, 'default value here' AS new_col
---   FROM ${self()};
+--   FROM ${self()} AS SELECT *,  'default value' AS new_col  FROM ${self()}

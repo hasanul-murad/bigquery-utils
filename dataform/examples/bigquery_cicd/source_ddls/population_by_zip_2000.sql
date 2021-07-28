@@ -1,4 +1,4 @@
-CREATE TABLE dataform_prod.population_by_zip_2000
+CREATE TABLE dataform_test.population_by_zip_2000
 (
   zipcode STRING NOT NULL OPTIONS(description="Five digit ZIP Code Tabulation Area Census Code"),
   geo_id STRING OPTIONS(description="Geo code"),

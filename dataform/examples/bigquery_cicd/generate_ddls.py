@@ -2,7 +2,7 @@ from pathlib import Path
 
 NUM_FILES_TO_GENERATE = 1000
 
-ddl_dir = Path("create_test_env/definitions/ddl_scale_test")
+ddl_dir = Path("create_prod_env/definitions/ddl_scale_test")
 ddl_dir.mkdir(exist_ok=True)
 for i in list(range(NUM_FILES_TO_GENERATE)):
     file_name = ddl_dir / f"test_table_{i}.sqlx"
