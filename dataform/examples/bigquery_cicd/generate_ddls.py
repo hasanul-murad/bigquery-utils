@@ -1,12 +1,13 @@
 from pathlib import Path
 
-NUM_FILES_TO_GENERATE = 2000
+NUM_FILES_TO_GENERATE = 1000
 
-Path("definitions/ddl_scale_test").mkdir(exist_ok=True)
+ddl_dir = Path("create_test_env/definitions/ddl_scale_test")
+ddl_dir.mkdir(exist_ok=True)
 for i in list(range(NUM_FILES_TO_GENERATE)):
-    file_name = f"definitions/ddl_scale_test/test_table_{i}.sqlx"
+    file_name = ddl_dir / f"test_table_{i}.sqlx"
     with open(file_name, 'w') as file:
-        file.write(f"""
+        file.write("""
         config {{ hasOutput: true }}
         
         CREATE TABLE IF NOT EXISTS ${{self()}}
