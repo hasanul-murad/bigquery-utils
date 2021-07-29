@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 # pylint: disable=no-name-in-module
 from google.cloud import bigquery  # type: ignore
@@ -9,7 +9,8 @@ from google.cloud import bigquery  # type: ignore
 
 class TableChanges:
     new_columns: List[bigquery.SchemaField] = []
-    existing_columns: List[bigquery.SchemaField] = []
+    table_schema_no_new_cols: Union[bigquery.SchemaField] = None
+    existing_columns: Dict = {}
     changed_columns_property_keys: Dict = defaultdict(list)
 
 
@@ -18,10 +19,12 @@ def check_for_existing_column_changes(test_table: bigquery.Table,
                                       table_changes: TableChanges):
     schema_tuples = list(zip(test_table.schema, prod_table.schema))
     for schema_tuple in schema_tuples:
-        if schema_tuple[0] != schema_tuple[1]:
-            test_table_field: bigquery.SchemaField = schema_tuple[0]
-            prod_table_field: bigquery.SchemaField = schema_tuple[1]
-            table_changes.existing_columns.append(test_table_field)
+        test_table_field: bigquery.SchemaField = schema_tuple[0]
+        prod_table_field: bigquery.SchemaField = schema_tuple[1]
+        table_changes.table_schema_no_new_cols = test_table.schema[:len(
+            prod_table.schema)]
+        table_changes.existing_columns[test_table_field.name] = test_table_field
+        if test_table_field != prod_table_field:
             if test_table_field.name != prod_table_field.name:
                 print(
                     f"Column name mismatch detected for table: {test_table.table_id}"
@@ -62,24 +65,34 @@ def write_table_update_ddl(file: Path, table_changes: TableChanges,
     output_ddl_dir_path.mkdir(exist_ok=True, parents=True)
     input_ddl = open(file).read()
     with open(output_ddl_dir_path / f'{file.stem}.sqlx', 'w') as ddl_file:
-        create_as_select_statement = f' AS SELECT * '
+        create_as_select_statement = f' AS SELECT '
         # Add SQL syntax for handling data type changes on existing columns
         cols_with_changes = table_changes.changed_columns_property_keys.keys()
         if table_changes.existing_columns:
-            create_as_select_statement += f"EXCEPT({','.join(cols_with_changes)}), "
-        for col_name in cols_with_changes:
-            changed_fields: List[str] = list(
-                table_changes.changed_columns_property_keys.get(
-                    col_name))  # type: ignore
-            if 'field_type' in changed_fields:
-                create_as_select_statement += f"CAST({col_name} AS TYPE) AS {col_name}"
-        create_as_select_statement += ','
+            print(table_changes.existing_columns)
+            for schemaField in table_changes.table_schema_no_new_cols:
+                if schemaField.name in cols_with_changes:
+                    changed_fields: List[str] = list(
+                        table_changes.changed_columns_property_keys.get(
+                            schemaField.name))  # type: ignore
+                    if 'field_type' in changed_fields:
+                        create_as_select_statement += f"CAST({schemaField.name} AS {table_changes.existing_columns.get(schemaField.name).field_type}) AS {schemaField.name},"  # type: ignore
+                    elif 'description' in changed_fields:
+                        # Description changes are handled by the DDL column list
+                        # so we just add the column to the select list
+                        create_as_select_statement += f"{schemaField.name},"
+                else:
+                    create_as_select_statement += f"{schemaField.name},"
+        else:
+            create_as_select_statement += "*,"
+
         # Add SQL syntax for setting default values on new columns
         for new_col in table_changes.new_columns:
             create_as_select_statement += f"'default value' AS {new_col.name},"
         create_as_select_statement += " FROM ${self()}"
         update_ddl = 'config { hasOutput: true }\n\n' + input_ddl
-        update_ddl = update_ddl.replace("CREATE TABLE", "CREATE OR REPLACE TABLE")
+        update_ddl = update_ddl.replace("CREATE TABLE",
+                                        "CREATE OR REPLACE TABLE")
         update_ddl = update_ddl.replace(";", create_as_select_statement)
         ddl_file.write(update_ddl)
 
