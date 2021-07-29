@@ -15,26 +15,3 @@ OPTIONS(
 ) AS
 SELECT *
 FROM bigquery-public-data.census_bureau_usa.population_by_zip_2000;
-
---   -- The DDL below should be injected/executed only during build/deploy
---   -- where schema changes are detected. The DDL below should not
---   -- be committed to repo, it's only shown here to demonstrate what
---   -- it would look like.
---   CREATE OR REPLACE TABLE ${self()}
---   (
---     zipcode STRING NOT NULL OPTIONS(description="Five digit ZIP Code Tabulation Area Census Code"),
---     geo_id STRING OPTIONS(description="Geo code"),
---     minimum_age INT64 OPTIONS(description="The minimum age in the age range. If null, this indicates the row as a total for male, female, or overall population."),
---     maximum_age INT64 OPTIONS(description="The maximum age in the age range. If null, this indicates the row as having no maximum (such as 85 and over) or the row is a total of the male, female, or overall population."),
---     gender STRING OPTIONS(description="male or female. If empty, the row is a total population summary."),
---     population INT64 OPTIONS(description="The total count of the population for this segment."),
---     new_col STRING,
---   )
---   OPTIONS(
---     labels=[("freebqcovid", "")]
---   )
---   -- The following will be dynamically injected into the new DDL by replacing
---   -- the semicolon with it.
---   AS
---   SELECT *, 'default value here' AS new_col
---   FROM ${self()} AS SELECT *,  'default value' AS new_col  FROM ${self()}
