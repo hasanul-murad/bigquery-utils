@@ -1,7 +1,6 @@
 #!/bin/bash
 
-PROJECT_ID=danny-bq
-BQ_LOCATION=US
+
 
 cleanup() {
  rm -rf node_modules
@@ -13,7 +12,18 @@ cleanup() {
  rm -rf apply_table_changes/
 }
 
-add_dataform_dependencies(){
+generate_dataform_configs(){
+  export PROJECT_ID=$1
+  export BQ_LOCATION=$2
+  export DATASET_ID=$3
+  envsubst < dataform_dev.json > dataform.json
+  # Create an .df-credentials.json file as shown below
+  # in order to have Dataform pick up application default credentials
+  # https://cloud.google.com/docs/authentication/production#automatically
+  echo "{\"projectId\": \"${PROJECT_ID}\", \"location\": \"${BQ_LOCATION}\"}" > .df-credentials.json
+}
+
+add_symbolic_dataform_dependencies(){
   local target_dir=$1
   # Create symbolic links to dataform config files and node_modules
   # to save time and not duplicate resources
@@ -40,14 +50,14 @@ deploy_mock_production_env() {
   export DATASET_ID=$1
   envsubst < dataform_dev.json > create_prod_env/dataform.json
   # Add sym links to Dataform configs/dependencies
-  add_dataform_dependencies create_prod_env
+  add_symbolic_dataform_dependencies create_prod_env
   dataform run create_prod_env/
 }
 
 deploy_ddls_in_test_env() {
   export DATASET_ID=$1
   envsubst < dataform_dev.json > create_test_env/dataform.json
-  add_dataform_dependencies create_test_env
+  add_symbolic_dataform_dependencies create_test_env
   # Create a mock test dataset. In real-world scenario, this will
   # be done by Terraform. Only done here for demo.
   bq mk --dataset dataform_test
@@ -61,7 +71,7 @@ deploy_ddl_changes() {
   python3 table_sync.py source_ddls --output-ddl-dir=apply_table_changes/definitions
   export DATASET_ID=$1
   envsubst < dataform_dev.json > apply_table_changes/dataform.json
-  add_dataform_dependencies apply_table_changes
+  add_symbolic_dataform_dependencies apply_table_changes
   dataform run apply_table_changes/
 }
 
@@ -69,17 +79,10 @@ deploy_ddl_changes() {
 # runtimes of real builds that start from scratch.
 cleanup
 
-export PROJECT_ID=danny-bq
-export DATASET_ID=dataform_prod
-envsubst < dataform_dev.json > dataform.json
+generate_dataform_configs danny-bq US dataform_test
 
 #python3 generate_ddls.py
 dataform install
-
-# Create an .df-credentials.json file as shown below
-# in order to have Dataform pick up application default credentials
-# https://cloud.google.com/docs/authentication/production#automatically
-echo "{\"projectId\": \"${PROJECT_ID}\", \"location\": \"${BQ_LOCATION}\"}" > .df-credentials.json
 
 deploy_mock_production_env dataform_prod
 deploy_ddls_in_test_env dataform_test
