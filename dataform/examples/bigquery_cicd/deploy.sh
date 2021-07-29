@@ -57,6 +57,10 @@ copy_sql_and_rename_to_sqlx() {
 # runtimes of real builds that start from scratch.
 cleanup
 
+export PROJECT_ID=danny-bq
+export DATASET_ID=dataform_prod
+envsubst < dataform_dev.json > dataform.json
+
 #python3 generate_ddls.py
 dataform install
 
