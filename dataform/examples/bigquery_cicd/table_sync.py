@@ -1,3 +1,4 @@
+import json
 from argparse import ArgumentParser
 from collections import defaultdict
 from pathlib import Path
@@ -5,6 +6,19 @@ from typing import Dict, List, Optional, Tuple, Union
 
 # pylint: disable=no-name-in-module
 from google.cloud import bigquery  # type: ignore
+
+
+class DefaultColumnTypeMapping:
+    default_values: Dict = {}
+
+    def __init__(self):
+        config_file_path = Path('column_type_default_values.json')
+        with open(config_file_path) as config_file:
+            json_default_values = json.loads(config_file.read())
+            if json_default_values.get('default_column_type_map'):
+                for column_type, default_value in json_default_values.get(
+                        'default_column_type_map').items():
+                    self.default_values[column_type] = default_value
 
 
 class TableChanges:
@@ -60,36 +74,41 @@ def check_for_new_columns(test_table: bigquery.Table,
 
 
 def write_table_update_ddl(file: Path, table_changes: TableChanges,
+                           default_col_type_mapping: DefaultColumnTypeMapping,
                            output_ddl_dir: str):
     output_ddl_dir_path = Path(output_ddl_dir)
     output_ddl_dir_path.mkdir(exist_ok=True, parents=True)
     input_ddl = open(file).read()
     with open(output_ddl_dir_path / f'{file.stem}.sqlx', 'w') as ddl_file:
-        create_as_select_statement = f' AS SELECT '
+        create_as_select_statement = f' AS\nSELECT '
         # Add SQL syntax for handling data type changes on existing columns
         cols_with_changes = table_changes.changed_columns_property_keys.keys()
         if table_changes.existing_columns:
-            print(table_changes.existing_columns)
             for schemaField in table_changes.table_schema_no_new_cols:
                 if schemaField.name in cols_with_changes:
                     changed_fields: List[str] = list(
                         table_changes.changed_columns_property_keys.get(
                             schemaField.name))  # type: ignore
                     if 'field_type' in changed_fields:
-                        create_as_select_statement += f"CAST({schemaField.name} AS {table_changes.existing_columns.get(schemaField.name).field_type}) AS {schemaField.name},"  # type: ignore
+                        create_as_select_statement += f"\nCAST({schemaField.name} AS {table_changes.existing_columns.get(schemaField.name).field_type}) AS {schemaField.name},"  # type: ignore
                     elif 'description' in changed_fields:
                         # Description changes are handled by the DDL column list
                         # so we just add the column to the select list
-                        create_as_select_statement += f"{schemaField.name},"
+                        create_as_select_statement += f"\n{schemaField.name},"
                 else:
-                    create_as_select_statement += f"{schemaField.name},"
+                    create_as_select_statement += f"\n{schemaField.name},"
         else:
             create_as_select_statement += "*,"
 
         # Add SQL syntax for setting default values on new columns
         for new_col in table_changes.new_columns:
-            create_as_select_statement += f"'default value' AS {new_col.name},"
-        create_as_select_statement += " FROM ${self()}"
+            if new_col.mode == 'REQUIRED':
+                default_value = default_col_type_mapping.default_values.get(
+                    new_col.field_type)
+                create_as_select_statement += f"\n{default_value} AS {new_col.name},"
+            else:
+                create_as_select_statement += f"\nNULL AS {new_col.name},"
+        create_as_select_statement += "\nFROM ${self()}"
         update_ddl = 'config { hasOutput: true }\n\n' + input_ddl
         update_ddl = update_ddl.replace("CREATE TABLE",
                                         "CREATE OR REPLACE TABLE")
@@ -97,10 +116,11 @@ def write_table_update_ddl(file: Path, table_changes: TableChanges,
         ddl_file.write(update_ddl)
 
 
-def check_ddl_directory_for_changes(bq_client: bigquery.Client, input_ddl_dir,
-                                    output_ddl_dir, test_project_id,
-                                    test_dataset_id, prod_project_id,
-                                    prod_dataset_id):
+def check_ddl_directory_for_changes(
+        bq_client: bigquery.Client,
+        default_col_type_mapping: DefaultColumnTypeMapping, input_ddl_dir,
+        output_ddl_dir, test_project_id, test_dataset_id, prod_project_id,
+        prod_dataset_id):
     for file in Path(input_ddl_dir).glob('*.sql'):
         test_table_id = file.stem
         test_table_ref = bq_client.get_table(
@@ -115,7 +135,8 @@ def check_ddl_directory_for_changes(bq_client: bigquery.Client, input_ddl_dir,
         table_changes: TableChanges = TableChanges()
         check_for_existing_column_changes(test_table, prod_table, table_changes)
         check_for_new_columns(test_table, prod_table, table_changes)
-        write_table_update_ddl(file, table_changes, output_ddl_dir)
+        write_table_update_ddl(file, table_changes, default_col_type_mapping,
+                               output_ddl_dir)
 
 
 def get_cmd_line_args():
@@ -142,10 +163,10 @@ def get_cmd_line_args():
 def main():
     args = get_cmd_line_args()
     bq_client = bigquery.Client(project=args.test_project_id)
-
-    check_ddl_directory_for_changes(bq_client, args.input_ddl_dir,
-                                    args.output_ddl_dir, "danny-bq",
-                                    "dataform_test", "danny-bq",
+    default_col_type_mapping = DefaultColumnTypeMapping()
+    check_ddl_directory_for_changes(bq_client, default_col_type_mapping,
+                                    args.input_ddl_dir, args.output_ddl_dir,
+                                    "danny-bq", "dataform_test", "danny-bq",
                                     "dataform_prod")
 
 

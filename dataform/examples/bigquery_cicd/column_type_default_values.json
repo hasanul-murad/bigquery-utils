@@ -1,13 +1,14 @@
 {
-    "default_column_type_map":
-    [
-        {
-            "type": "STRING",
-            "default_value": "this is default"
-        },
-        {
-            "type": "NUMERIC",
-            "default_value": 0.0
+    "default_column_type_map": {
+        "STRING" : "'this is the default value'",
+        "NUMERIC": "CAST(0.0 AS NUMERIC)",
+        "INT64": "CAST(0 AS INT64)",
+        "DATE": "CAST('9999-12-31' AS DATE)",
+        "TIMESTAMP": "CAST('9999-12-31 23:59:59.999999' AS TIMESTAMP)"
+    },
+    "per_table_column_type_default_value_override": {
+        "table_id": {
+            "STRING": "'this is a new default value'"
         }
-    ]
+    }
 }
