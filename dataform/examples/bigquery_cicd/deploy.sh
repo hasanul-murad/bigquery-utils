@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 cleanup() {
  rm -rf node_modules
  rm -f package-lock.json
@@ -43,6 +41,8 @@ copy_sql_and_rename_to_sqlx() {
     destination="${target_dir}/${newfilename}.sqlx"
     printf "Copying file %s to %s\n" "$file" "$destination"
     cp "${file}" "${destination}"
+    # Add "config { hasOutput: true }" to top of file
+    sed -i '' "1s|^|config { hasOutput: true }\n|" "${destination}"
   done <<<"$(find "${ddl_dir}" -type f -name "*.sql")"
 }
 

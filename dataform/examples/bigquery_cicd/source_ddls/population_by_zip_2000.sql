@@ -1,4 +1,3 @@
-config { hasOutput: true }
 CREATE TABLE ${self()}
 (
   zipcode STRING NOT NULL OPTIONS(description="Five digit ZIP Code Tabulation Area Census Code"),

@@ -1,4 +1,3 @@
-config { hasOutput: true }
 CREATE TABLE ${self()}
 (
   geo_id STRING OPTIONS(description="Geo code"),
