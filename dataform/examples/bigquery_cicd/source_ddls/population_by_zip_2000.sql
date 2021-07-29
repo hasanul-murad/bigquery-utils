@@ -9,6 +9,7 @@ CREATE TABLE ${self()}
   population INT64 OPTIONS(description="The total count of the population for this segment."),
   this_is_some_new_column STRING NOT NULL,
   oh_look_another_new_column NUMERIC NOT NULL,
+  this_column_can_be_null DATE,
 )
 OPTIONS(
   labels=[("freebqcovid", "")]
