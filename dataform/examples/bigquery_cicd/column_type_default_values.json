@@ -1,7 +1,7 @@
 {
     "default_column_type_map": {
              "STRING": "'this is the default value'",
-              "BYTES": "CAST(0 AS BYTES)",
+              "BYTES": "CAST('0' AS BYTES)",
             "INTEGER": "CAST(0 AS INT64)",
               "FLOAT": "CAST(0 AS FLOAT64)",
             "BOOLEAN": "CAST(0 AS BOOL)",
