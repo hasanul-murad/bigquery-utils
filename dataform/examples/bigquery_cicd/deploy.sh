@@ -8,6 +8,7 @@ cleanup() {
  bq rm -r -f --dataset dataform_test
  rm -rf definitions/ddl_scale_test
  rm -rf apply_table_changes/
+ rm -rf create_test_env/
 }
 
 generate_dataform_configs(){
