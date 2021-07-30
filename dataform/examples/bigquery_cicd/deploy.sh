@@ -16,6 +16,8 @@ generate_dataform_configs(){
   export DATASET_ID=$2
   envsubst < dataform_dev.json > dataform.json
   generate_dataform_credentials "${PROJECT_ID}" .
+  #redirect to null to avoid noise
+  dataform install > /dev/null 2>&1
 }
 
 generate_dataform_credentials(){
@@ -121,13 +123,11 @@ main(){
   generate_dataform_configs $TEST_PROJECT_ID $TEST_DATASET_ID
 
   ##python3 generate_ddls.py
-  dataform install
 
   deploy_mock_production_env $PROD_PROJECT_ID $PROD_DATASET_ID
   deploy_ddls_in_test_env $TEST_PROJECT_ID $TEST_DATASET_ID
   deploy_ddl_changes $DEPLOY_PROJECT_ID $DEPLOY_DATASET_ID
 }
-
 
 main
 
