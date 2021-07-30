@@ -57,6 +57,7 @@ deploy_mock_production_env() {
 
 deploy_ddls_in_test_env() {
   export DATASET_ID=$1
+  mkdir -p create_test_env/definitions
   envsubst < dataform_dev.json > create_test_env/dataform.json
   add_symbolic_dataform_dependencies create_test_env
   # Create a mock test dataset. In real-world scenario, this will
@@ -69,8 +70,8 @@ deploy_ddls_in_test_env() {
 }
 
 deploy_ddl_changes() {
-  python3 table_sync.py source_ddls --output-ddl-dir=apply_table_changes/definitions
   export DATASET_ID=$1
+  python3 table_sync.py source_ddls --output-ddl-dir=apply_table_changes/definitions
   envsubst < dataform_dev.json > apply_table_changes/dataform.json
   add_symbolic_dataform_dependencies apply_table_changes
   dataform run apply_table_changes/
