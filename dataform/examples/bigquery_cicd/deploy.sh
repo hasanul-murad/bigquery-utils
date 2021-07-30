@@ -13,8 +13,7 @@ cleanup() {
 
 generate_dataform_configs(){
   export PROJECT_ID=$1
-  export BQ_LOCATION=$2
-  export DATASET_ID=$3
+  export DATASET_ID=$2
   envsubst < dataform_dev.json > dataform.json
   # Create an .df-credentials.json file as shown below
   # in order to have Dataform pick up application default credentials
@@ -26,10 +25,8 @@ add_symbolic_dataform_dependencies(){
   local target_dir=$1
   # Create symbolic links to dataform config files and node_modules
   # to save time and not duplicate resources
-#  ln -sf "$(pwd)"/dataform.json "${target_dir}"/dataform.json
   ln -sf "$(pwd)"/package.json "${target_dir}"/package.json
   ln -sf "$(pwd)"/node_modules/ "${target_dir}"/node_modules
-  ln -sf "$(pwd)"/.df-credentials.json "${target_dir}"/.df-credentials.json
 }
 
 copy_sql_and_rename_to_sqlx() {
@@ -49,7 +46,9 @@ copy_sql_and_rename_to_sqlx() {
 }
 
 deploy_mock_production_env() {
-  export DATASET_ID=$1
+  export PROJECT_ID=$1
+  export DATASET_ID=$2
+  echo "{\"projectId\": \"${PROJECT_ID}\", \"location\": \"${BQ_LOCATION}\"}" > create_prod_env/.df-credentials.json
   envsubst < dataform_dev.json > create_prod_env/dataform.json
   # Add sym links to Dataform configs/dependencies
   add_symbolic_dataform_dependencies create_prod_env
@@ -57,8 +56,10 @@ deploy_mock_production_env() {
 }
 
 deploy_ddls_in_test_env() {
-  export DATASET_ID=$1
+  export PROJECT_ID=$1
+  export DATASET_ID=$2
   mkdir -p create_test_env/definitions
+  echo "{\"projectId\": \"${PROJECT_ID}\", \"location\": \"${BQ_LOCATION}\"}" > create_test_env/.df-credentials.json
   envsubst < dataform_dev.json > create_test_env/dataform.json
   add_symbolic_dataform_dependencies create_test_env
   # Create a mock test dataset. In real-world scenario, this will
@@ -71,27 +72,54 @@ deploy_ddls_in_test_env() {
 }
 
 deploy_ddl_changes() {
-  export DATASET_ID=$1
+  export PROJECT_ID=$1
   python3 table_sync.py source_ddls \
     --output-ddl-dir=apply_table_changes/definitions \
-    --test-project-id=danny-bq \
-    --test-dataset-id=dataform_test \
-    --prod-project-id=danny-bq \
-    --prod-dataset-id=dataform_prod
+    --test-project-id="${PROJECT_ID}" \
+    --test-dataset-id="${TEST_DATASET_ID}" \
+    --prod-project-id="${PROD_PROJECT_ID}" \
+    --prod-dataset-id="${PROD_DATASET_ID}"
+  echo "{\"projectId\": \"${PROJECT_ID}\", \"location\": \"${BQ_LOCATION}\"}" > apply_table_changes/.df-credentials.json
   envsubst < dataform_dev.json > apply_table_changes/dataform.json
   add_symbolic_dataform_dependencies apply_table_changes
   dataform run apply_table_changes/
 }
 
-# Cleaning only necessary when running locally to simulate
-# runtimes of real builds that start from scratch.
-cleanup
+set_env_vars(){
+  # For now, this build script assumes all BigQuery environments
+  # live in the same location which you specify below.
+  export BQ_LOCATION=US
 
-generate_dataform_configs danny-bq US dataform_test
+  # PROD project points to the live BigQuery environment
+  # which must be kept in sync with DDL changes.
+  export PROD_PROJECT_ID=danny-bq
+  export PROD_DATASET_ID=dataform_prod
 
-##python3 generate_ddls.py
-dataform install
+  # DDLs will be staged in the TEST project
+  export TEST_PROJECT_ID=danny-bq
+  export TEST_DATASET_ID=dataform_test
 
-deploy_mock_production_env dataform_prod
-deploy_ddls_in_test_env dataform_test
-deploy_ddl_changes dataform_prod
+  # This is the project which will receive DDL changes
+  export DEPLOY_PROJECT_ID=danny-bq
+}
+
+main(){
+  # Cleaning only necessary when running locally to simulate
+  # runtimes of real builds that start from scratch.
+  cleanup
+
+  set_env_vars
+
+  generate_dataform_configs $TEST_PROJECT_ID $TEST_DATASET_ID
+
+  ##python3 generate_ddls.py
+  dataform install
+
+  deploy_mock_production_env $PROD_PROJECT_ID $PROD_DATASET_ID
+  deploy_ddls_in_test_env $TEST_PROJECT_ID $TEST_DATASET_ID
+  deploy_ddl_changes $DEPLOY_PROJECT_ID
+}
+
+
+main
+

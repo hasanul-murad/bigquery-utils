@@ -163,7 +163,7 @@ def get_cmd_line_args():
     parser.add_argument('input_ddl_dir', help='Directory holding input DDLs')
     parser.add_argument(
         '--output-ddl-dir',
-        help='Directory where this tool writes updated SQLX DDLs to be run by Dataform.')
+        help='Directory where this tool writes updated SQLX DDLs to be run by Dataform. ')
     parser.add_argument(
         '--test-project-id',
         help='BigQuery project in which the tool deploys input DDLs.')
