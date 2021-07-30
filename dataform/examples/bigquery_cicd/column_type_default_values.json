@@ -1,10 +1,16 @@
 {
     "default_column_type_map": {
-        "STRING" : "'this is the default value'",
-        "NUMERIC": "CAST(0.0 AS NUMERIC)",
-        "INT64": "CAST(0 AS INT64)",
-        "DATE": "CAST('9999-12-31' AS DATE)",
-        "TIMESTAMP": "CAST('9999-12-31 23:59:59.999999' AS TIMESTAMP)"
+             "STRING": "'this is the default value'",
+              "BYTES": "CAST(0 AS BYTES)",
+            "INTEGER": "CAST(0 AS INT64)",
+              "FLOAT": "CAST(0 AS FLOAT64)",
+            "BOOLEAN": "CAST(0 AS BOOL)",
+          "TIMESTAMP": "CAST('9999-12-31 23:59:59.999999' AS TIMESTAMP)",
+               "DATE": "CAST('9999-12-31' AS DATE)",
+               "TIME": "CAST('23:59:59.999999' AS TIME)",
+           "DATETIME": "CAST('9999-12-31 23:59:59.999999' AS DATETIME)",
+            "NUMERIC": "CAST(0.0 AS NUMERIC)",
+         "BIGNUMERIC": "CAST(0.0 AS BIGNUMERIC)"
     },
     "per_table_column_type_default_value_override": {
         "table_id": {

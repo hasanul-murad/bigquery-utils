@@ -3,7 +3,7 @@ import re
 from argparse import ArgumentParser
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Sequence
 
 # pylint: disable=no-name-in-module
 from google.cloud import bigquery  # type: ignore
@@ -24,7 +24,7 @@ class DefaultColumnTypeMapping:
 
 class TableChanges:
     new_columns: List[bigquery.SchemaField] = []
-    table_schema_no_new_cols: Union[bigquery.SchemaField] = None
+    table_schema_no_new_cols: Sequence[bigquery.SchemaField] = bigquery.schema
     existing_columns: Dict = {}
     changed_columns_property_keys: Dict = defaultdict(list)
 
@@ -42,25 +42,25 @@ def check_for_existing_column_changes(test_table: bigquery.Table,
         if test_table_field != prod_table_field:
             if test_table_field.name != prod_table_field.name:
                 print(
-                    f"Column name mismatch detected for table: {test_table.table_id}"
+                    f'Column name mismatch detected for table: {test_table.table_id}'
                 )
                 table_changes.changed_columns_property_keys[
                     test_table_field.name].append('name')
             if test_table_field.description != prod_table_field.description:
                 print(
-                    f"Column description mismatch detected for table: {test_table.table_id}"
+                    f'Column description mismatch detected for table: {test_table.table_id}'
                 )
                 table_changes.changed_columns_property_keys[
                     test_table_field.name].append('description')
             if test_table_field.field_type != prod_table_field.field_type:
                 print(
-                    f"Column field type mismatch detected for table: {test_table.table_id}"
+                    f'Column field type mismatch detected for table: {test_table.table_id}'
                 )
                 table_changes.changed_columns_property_keys[
                     test_table_field.name].append('field_type')
             if test_table_field.mode != prod_table_field.mode:
                 print(
-                    f"Column mode mismatch detected for table: {test_table.table_id}"
+                    f'Column mode mismatch detected for table: {test_table.table_id}'
                 )
                 table_changes.changed_columns_property_keys[
                     test_table_field.name].append('mode')
@@ -70,7 +70,7 @@ def check_for_new_columns(test_table: bigquery.Table,
                           prod_table: bigquery.Table,
                           table_changes: TableChanges):
     if len(test_table.schema) > len(prod_table.schema):
-        print(f"New columns detected for table: {test_table.table_id}")
+        print(f'New columns detected for table: {test_table.table_id}')
         table_changes.new_columns = test_table.schema[len(prod_table.schema):]
 
 
@@ -81,7 +81,7 @@ def write_table_update_ddl(file: Path, table_changes: TableChanges,
     output_ddl_dir_path.mkdir(exist_ok=True, parents=True)
     input_ddl = open(file).read()
     with open(output_ddl_dir_path / f'{file.stem}.sqlx', 'w') as ddl_file:
-        create_as_select_statement = f' AS\nSELECT '
+        select_statement = f' AS\nSELECT '
         # Add SQL syntax for handling data type changes on existing columns
         cols_with_changes = table_changes.changed_columns_property_keys.keys()
         if table_changes.existing_columns:
@@ -91,29 +91,46 @@ def write_table_update_ddl(file: Path, table_changes: TableChanges,
                         table_changes.changed_columns_property_keys.get(
                             schemaField.name))  # type: ignore
                     if 'field_type' in changed_fields:
-                        create_as_select_statement += f"\nCAST({schemaField.name} AS {table_changes.existing_columns.get(schemaField.name).field_type}) AS {schemaField.name},"  # type: ignore
+                        # Field type changes will be implemented as:
+                        # CAST(col AS NEW_TYPE) AS col
+                        new_type = table_changes.existing_columns.get(
+                            schemaField.name).field_type  # type: ignore
+                        select_statement += f'\nCAST({schemaField.name} AS {new_type}) AS {schemaField.name},'
                     elif 'description' in changed_fields:
                         # Description changes are handled by the DDL column list
-                        # so we just add the column to the select list
-                        create_as_select_statement += f"\n{schemaField.name},"
+                        # so we just add the column to the select list.
+                        select_statement += f'\n{schemaField.name},'
+                    elif 'mode' in changed_fields:
+                        if schemaField.mode == 'REQUIRED':
+                            # Mode changes to REQUIRED will be implemented as:
+                            # "SELECT IF(col IS NULL, default_value, col) AS col"
+                            # where default_value comes from the user-provided default mapping.
+                            defaut_value = default_col_type_mapping.default_values.get(
+                                schemaField.field_type)
+                            select_statement += f'\nIF({schemaField.name} IS NULL, {defaut_value}, {schemaField.name}) AS {schemaField.name},'
+                        elif schemaField.mode == 'NULLABLE':
+                            # Mode changes to NULLABLE will be implemented as:
+                            # "SELECT col" since NULLs are allowed.
+                            select_statement += f'\n{schemaField.name},'
                 else:
-                    create_as_select_statement += f"\n{schemaField.name},"
+                    # Columns without schema changes will simply be listed in SELECT statement
+                    select_statement += f'\n{schemaField.name},'
         else:
-            create_as_select_statement += "*,"
+            select_statement += '*,'
 
         # Add SQL syntax for setting default values on new columns
         for new_col in table_changes.new_columns:
             if new_col.mode == 'REQUIRED':
                 default_value = default_col_type_mapping.default_values.get(
                     new_col.field_type)
-                create_as_select_statement += f"\n{default_value} AS {new_col.name},"
+                select_statement += f'\n{default_value} AS {new_col.name},'
             else:
-                create_as_select_statement += f"\nNULL AS {new_col.name},"
-        create_as_select_statement += "\nFROM ${self()}"
+                select_statement += f'\nNULL AS {new_col.name},'
+        select_statement += '\nFROM ${self()}'
         update_ddl = 'config { hasOutput: true }\n\n' + input_ddl
         update_ddl = re.sub(r'CREATE TABLE [\w]+\.[\w\-]+',
                             'CREATE OR REPLACE TABLE ${self()}', update_ddl)
-        update_ddl = update_ddl.replace(";", create_as_select_statement)
+        update_ddl = update_ddl.replace(';', select_statement)
         ddl_file.write(update_ddl)
 
 
@@ -126,10 +143,10 @@ def check_ddl_directory_for_changes(
         test_table_id = file.stem
         test_table_ref = bq_client.get_table(
             bigquery.Table.from_string(
-                f"{test_project_id}.{test_dataset_id}.{test_table_id}"))
+                f'{test_project_id}.{test_dataset_id}.{test_table_id}'))
         prod_table_ref = bq_client.get_table(
             bigquery.Table.from_string(
-                f"{prod_project_id}.{prod_dataset_id}.{test_table_id}"))
+                f'{prod_project_id}.{prod_dataset_id}.{test_table_id}'))
 
         test_table: bigquery.Table = bq_client.get_table(test_table_ref)
         prod_table: bigquery.Table = bq_client.get_table(prod_table_ref)
@@ -167,8 +184,8 @@ def main():
     default_col_type_mapping = DefaultColumnTypeMapping()
     check_ddl_directory_for_changes(bq_client, default_col_type_mapping,
                                     args.input_ddl_dir, args.output_ddl_dir,
-                                    "danny-bq", "dataform_test", "danny-bq",
-                                    "dataform_prod")
+                                    'danny-bq', 'dataform_test', 'danny-bq',
+                                    'dataform_prod')
 
 
 if __name__ == '__main__':

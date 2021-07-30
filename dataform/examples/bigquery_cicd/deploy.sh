@@ -88,6 +88,3 @@ dataform install
 deploy_mock_production_env dataform_prod
 deploy_ddls_in_test_env dataform_test
 deploy_ddl_changes dataform_prod
-
-copy_sql_and_rename_to_sqlx source_ddls create_test_env/definitions
-
