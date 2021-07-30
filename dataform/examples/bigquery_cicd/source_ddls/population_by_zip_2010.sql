@@ -1,4 +1,4 @@
-CREATE TABLE ${self()}
+CREATE TABLE dataform_prod.population_by_zip_2010
 (
   geo_id STRING OPTIONS(description="Geo code"),
   zipcode STRING NOT NULL OPTIONS(description="IVE BEEN UPDATED"),

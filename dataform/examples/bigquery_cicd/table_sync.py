@@ -1,4 +1,5 @@
 import json
+import re
 from argparse import ArgumentParser
 from collections import defaultdict
 from pathlib import Path
@@ -110,8 +111,8 @@ def write_table_update_ddl(file: Path, table_changes: TableChanges,
                 create_as_select_statement += f"\nNULL AS {new_col.name},"
         create_as_select_statement += "\nFROM ${self()}"
         update_ddl = 'config { hasOutput: true }\n\n' + input_ddl
-        update_ddl = update_ddl.replace("CREATE TABLE",
-                                        "CREATE OR REPLACE TABLE")
+        update_ddl = re.sub(r'CREATE TABLE [\w]+\.[\w\-]+',
+                            'CREATE OR REPLACE TABLE ${self()}', update_ddl)
         update_ddl = update_ddl.replace(";", create_as_select_statement)
         ddl_file.write(update_ddl)
 

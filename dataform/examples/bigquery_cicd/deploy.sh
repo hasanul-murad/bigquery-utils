@@ -42,7 +42,8 @@ copy_sql_and_rename_to_sqlx() {
     printf "Copying file %s to %s\n" "$file" "$destination"
     cp "${file}" "${destination}"
     # Add "config { hasOutput: true }" to top of file
-    sed -i '' "1s|^|config { hasOutput: true }\n|" "${destination}"
+    sed -i "1s|^|config { hasOutput: true }\n|" "${destination}"
+    sed -i -r "s|CREATE TABLE [0-9A-Za-z_]+\.[0-9A-Za-z_\-]+|CREATE TABLE \${self()}|" "${destination}"
   done <<<"$(find "${ddl_dir}" -type f -name "*.sql")"
 }
 
@@ -81,11 +82,12 @@ cleanup
 
 generate_dataform_configs danny-bq US dataform_test
 
-#python3 generate_ddls.py
+##python3 generate_ddls.py
 dataform install
 
 deploy_mock_production_env dataform_prod
 deploy_ddls_in_test_env dataform_test
 deploy_ddl_changes dataform_prod
 
+copy_sql_and_rename_to_sqlx source_ddls create_test_env/definitions
 
