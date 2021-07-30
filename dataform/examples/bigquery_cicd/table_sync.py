@@ -162,6 +162,9 @@ def get_cmd_line_args():
         description='This tool keeps BigQuery in sync with DDLs from a repo.')
     parser.add_argument('input_ddl_dir', help='Directory holding input DDLs')
     parser.add_argument(
+        '--output-ddl-dir',
+        help='Directory where this tool writes updated SQLX DDLs to be run by Dataform.')
+    parser.add_argument(
         '--test-project-id',
         help='BigQuery project in which the tool deploys input DDLs.')
     parser.add_argument(
@@ -172,9 +175,6 @@ def get_cmd_line_args():
         help='BigQuery project in which the tool deploys changes.')
     parser.add_argument('--prod-dataset-id',
                         help='GCP Project in which the tool deploys changes.')
-    parser.add_argument(
-        '--output-ddl-dir',
-        help='GCP Project in which the tool deploys input DDLs.')
     return parser.parse_args()
 
 
@@ -184,8 +184,8 @@ def main():
     default_col_type_mapping = DefaultColumnTypeMapping()
     check_ddl_directory_for_changes(bq_client, default_col_type_mapping,
                                     args.input_ddl_dir, args.output_ddl_dir,
-                                    'danny-bq', 'dataform_test', 'danny-bq',
-                                    'dataform_prod')
+                                    args.test_project_id, args.test_dataset_id,
+                                    args.prod_project_id, args.prod_dataset_id)
 
 
 if __name__ == '__main__':

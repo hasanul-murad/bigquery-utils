@@ -72,7 +72,12 @@ deploy_ddls_in_test_env() {
 
 deploy_ddl_changes() {
   export DATASET_ID=$1
-  python3 table_sync.py source_ddls --output-ddl-dir=apply_table_changes/definitions
+  python3 table_sync.py source_ddls \
+    --output-ddl-dir=apply_table_changes/definitions \
+    --test-project-id=danny-bq \
+    --test-dataset-id=dataform_test \
+    --prod-project-id=danny-bq \
+    --prod-dataset-id=dataform_prod
   envsubst < dataform_dev.json > apply_table_changes/dataform.json
   add_symbolic_dataform_dependencies apply_table_changes
   dataform run apply_table_changes/
