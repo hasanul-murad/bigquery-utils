@@ -14,7 +14,7 @@
     },
     "per_table_column_type_default_value_override": {
         "table_id": {
-            "STRING": "'this is a new default value'"
+          "col_name": "'this is a new default value'"
         }
     }
 }

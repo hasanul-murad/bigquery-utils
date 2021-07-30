@@ -122,8 +122,6 @@ main(){
 
   generate_dataform_configs $TEST_PROJECT_ID $TEST_DATASET_ID
 
-  ##python3 generate_ddls.py
-
   deploy_mock_production_env $PROD_PROJECT_ID $PROD_DATASET_ID
   deploy_ddls_in_test_env $TEST_PROJECT_ID $TEST_DATASET_ID
   deploy_ddl_changes $DEPLOY_PROJECT_ID $DEPLOY_DATASET_ID
