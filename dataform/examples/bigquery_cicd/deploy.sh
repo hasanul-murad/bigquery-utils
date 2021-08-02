@@ -50,7 +50,9 @@ copy_sql_and_rename_to_sqlx() {
     # Add "config { hasOutput: true }" to top of file
     sed -i "1s|^|config { hasOutput: true }\n|" "${destination}"
     sed -i -r "s|CREATE TABLE [0-9A-Za-z_]+\.[0-9A-Za-z_\-]+|CREATE TABLE \${self()}|" "${destination}"
-  done <<<"$(find "${ddl_dir}" -type f -name "*.sql")"
+  done <<<"$(
+    find "${ddl_dir}" -type f -name "*.sql"
+  )"
 }
 
 deploy_mock_production_env() {
