@@ -772,10 +772,10 @@ def wait_on_bq_job_id(bq_client: bigquery.Client,
             logging.log_bigquery_job(job, table,
                                      f"Waiting on BigQuery Job {job.job_id=}")
             time.sleep(polling_interval)
-        logging.log_bigquery_job(
-            job, table,
-            f"Reached polling timeout waiting for bigquery job {job.job_id=}.",
-            "WARN")
+    logging.log_bigquery_job(
+        job, table,
+        f"Reached polling timeout waiting for bigquery job {job.job_id=}.",
+        "WARN")
     return False
 
 
