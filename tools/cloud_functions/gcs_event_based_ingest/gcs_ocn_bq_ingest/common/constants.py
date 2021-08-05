@@ -148,3 +148,5 @@ NON_BQ_JOB_ID_REGEX = r'[^0-9a-zA-Z_\-]+'
 # be dropped under the table prefix
 WAIT_FOR_VALIDATION = bool(
     distutils.util.strtobool(os.getenv("WAIT_FOR_VALIDATION", "False")))
+
+NUM_RETRIES_FOR_BIGQUERY_INTERNAL_ERRORS = 3

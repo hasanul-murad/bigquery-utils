@@ -84,6 +84,7 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
             "setting the timeout to 540 seconds or at least "
             "1 minute (Cloud Functions default).")
     while time.monotonic() < restart_time - polling_timeout - 1:
+        retry = False
         first_bq_lock_claim = False
         lock_contents_str = utils.read_gcs_file_if_exists(
             gcs_client, f"gs://{bkt.name}/{lock_blob.name}")
@@ -104,9 +105,18 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
                     if job_id.startswith(
                             os.getenv('JOB_PREFIX',
                                       constants.DEFAULT_JOB_PREFIX)):
-                        last_job_done = wait_on_last_job(
-                            bq_client, lock_blob, backfill_blob, job_id, table,
-                            polling_timeout)
+                        if lock_contents.get('retry_attempt_cnt'):
+                            # Increment the retry count
+                            retry_attempt_cnt: int = int(
+                                int(lock_contents['retry_attempt_cnt'])) + 1
+                            last_job_done, retry = wait_on_last_job(
+                                gcs_client, bq_client, lock_blob, backfill_blob,
+                                job_id, table, polling_timeout,
+                                retry_attempt_cnt)
+                        else:
+                            last_job_done, retry = wait_on_last_job(
+                                gcs_client, bq_client, lock_blob, backfill_blob,
+                                job_id, table, polling_timeout, 0)
                     else:
                         print(
                             f"sleeping for {polling_timeout} seconds because"
@@ -148,12 +158,13 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
                       f"the _backlog items.")
                 return
 
-        # Submit the next item in the _backlog if it is non-empty or
-        # clean up the _BACKFILL and _bqlock files
-        should_subscriber_exit = handle_backlog(gcs_client, bq_client, bkt,
-                                                lock_blob, backfill_blob)
-        if should_subscriber_exit:
-            return
+        if not retry:
+            # Submit the next item in the _backlog if it is non-empty or
+            # clean up the _BACKFILL and _bqlock files
+            should_subscriber_exit = handle_backlog(gcs_client, bq_client, bkt,
+                                                    lock_blob, backfill_blob)
+            if should_subscriber_exit:
+                return
     # re-trigger the subscriber loop by reposting the _BACKFILL file
     print("ran out of time, restarting backfill subscriber loop for:"
           f"gs://{bkt.name}/{table_prefix}")
@@ -161,24 +172,48 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
     backfill_blob.upload_from_string("")
 
 
-def wait_on_last_job(bq_client: bigquery.Client, lock_blob: storage.Blob,
-                     backfill_blob: storage.blob, job_id: str,
-                     table: bigquery.TableReference, polling_timeout: int):
+def wait_on_last_job(gcs_client: storage.client, bq_client: bigquery.Client,
+                     lock_blob: storage.Blob, backfill_blob: storage.blob,
+                     job_id: str, table: bigquery.TableReference,
+                     polling_timeout: int,
+                     retry_attempt_cnt: int) -> Tuple[bool, bool]:
     """wait on a bigquery job or raise informative exception.
 
     Args:
+        gcs_client: storage.Client
         bq_client: bigquery.Client
         lock_blob: storage.Blob _bqlock blob
         backfill_blob: storage.blob _BACKFILL blob
         job_id: str BigQuery job ID to wait on (read from _bqlock file)
         table: bigquery.TableReference table being loaded
         polling_timeout: int seconds to poll before returning.
+        retry_attempt_cnt: counter for retry attempts
     """
     try:
         return utils.wait_on_bq_job_id(bq_client, job_id, table,
-                                       polling_timeout)
-    except (exceptions.BigQueryJobFailure,
-            google.api_core.exceptions.NotFound) as err:
+                                       polling_timeout), False
+    except (exceptions.BigQueryJobFailure, google.api_core.exceptions.NotFound,
+            google.api_core.exceptions.ServerError) as err:
+        # Retry all internal 5xx errors up to user-defined limit
+        # set in NUM_RETRIES_FOR_BIGQUERY_INTERNAL_ERRORS constant
+        if isinstance(err, google.api_core.exceptions.ServerError):
+            if retry_attempt_cnt <= constants.NUM_RETRIES_FOR_BIGQUERY_INTERNAL_ERRORS:
+                utils.handle_bq_lock(gcs_client,
+                                     lock_blob,
+                                     job_id,
+                                     table,
+                                     retry_attempt_cnt=retry_attempt_cnt)
+                return True, True
+            else:
+                # Reaching this point means all retries on 5xx errors have
+                # been unsuccessful so now we'll write the error to the
+                # _bqlock file, then raise an exception.
+                utils.handle_bq_lock(gcs_client,
+                                     lock_blob,
+                                     err.message,
+                                     table,
+                                     retry_attempt_cnt=retry_attempt_cnt)
+
         raise exceptions.BigQueryJobFailure(
             f"previous BigQuery job: {job_id} failed or could not "
             "be found. This will kill the backfill subscriber for "

@@ -718,6 +718,11 @@ def check_for_bq_job_and_children_errors(
         wait_on_bq_job_id(bq_client, job.job_id, table, 5)
     if job.errors:
         logging.log_bigquery_job(job, table)
+        # Raise any 5xx error codes
+        exception: Optional[
+            google.api_core.exceptions.GoogleAPICallError] = job.exception()
+        if isinstance(exception, google.api_core.exceptions.ServerError):
+            raise exception
         raise exceptions.BigQueryJobFailure(
             f"BigQuery Job {job.job_id} failed during backfill with the "
             f"following errors: {job.errors} "
@@ -959,22 +964,27 @@ def create_job_id(success_file_path, data_source_name=None, table=None):
     return clean_job_id[:1024]  # make sure job id isn't too long
 
 
-def handle_bq_lock(gcs_client: storage.Client, lock_blob: storage.Blob,
-                   next_job_id: Optional[str], table: bigquery.TableReference):
+def handle_bq_lock(gcs_client: storage.Client,
+                   lock_blob: storage.Blob,
+                   next_job_id: Optional[str],
+                   table: bigquery.TableReference,
+                   retry_attempt_cnt: Optional[int] = None):
     """Reclaim the lock blob for the new job id (in-place) or delete the lock
     blob if next_job_id is None."""
     try:
         if next_job_id:
+            lock_blob_contents = json.dumps(
+                dict(job_id=next_job_id,
+                     table=table.to_api_repr(),
+                     retry_attempt_cnt=retry_attempt_cnt))
             if lock_blob.exists(client=gcs_client):
                 lock_blob.upload_from_string(
-                    json.dumps(
-                        dict(job_id=next_job_id, table=table.to_api_repr())),
+                    lock_blob_contents,
                     if_generation_match=lock_blob.generation,
                     client=gcs_client)
             else:  # This happens when submitting the first job in the backlog
                 lock_blob.upload_from_string(
-                    json.dumps(
-                        dict(job_id=next_job_id, table=table.to_api_repr())),
+                    lock_blob_contents,
                     if_generation_match=0,  # noqa: E126
                     client=gcs_client)
         else:
