@@ -716,7 +716,7 @@ def check_for_bq_job_and_children_errors(
     """
     if job.state != "DONE":
         wait_on_bq_job_id(bq_client, job.job_id, table, 5)
-    if job.errors:
+    if job.errors or job.error_result:
         logging.log_bigquery_job(job, table)
         # Raise any 5xx error codes
         exception: Optional[

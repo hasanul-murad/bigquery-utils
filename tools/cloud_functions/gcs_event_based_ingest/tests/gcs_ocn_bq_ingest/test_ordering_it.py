@@ -18,6 +18,8 @@ import os
 import queue
 import time
 from typing import List, Optional
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 from google.cloud import bigquery
@@ -540,3 +542,54 @@ def _post_a_new_batch(gcs_bucket, dest_ordered_update_table):
                                                    "04", test_file),
                                       client=gcs)
     return gcs_ocn_bq_ingest.common.ordering.backlog_publisher(gcs, data_obj)
+
+
+@patch('google.cloud.bigquery.TableReference')
+def test_bq_internal_failure(mock_table_reference):
+    import json
+
+    import google.api_core.exceptions
+    test_table = Mock()
+    test_table.to_api_repr.return_value = {
+        'table': 'projectId.datasetId.tableId'
+    }
+    mock_table_reference.from_api_repr.return_value = test_table
+    gcs_client = Mock(spec=storage.Client)
+    bq_client = Mock(spec=bigquery.Client)
+    bq_job = Mock(spec=bigquery.QueryJob)
+    bq_job.to_api_repr.return_value = 'job'
+    bq_job.state = "DONE"
+    bq_job.errors = 'Internal Error'
+    bq_job.exception.return_value = google.api_core.exceptions.ServerError(
+        'Internal Error')
+    bq_client.get_job.return_value = bq_job
+
+    class MockReadGcsFileIfExists(Mock):
+
+        def __init__(self):
+            super().__init__()
+            self.counter = 0
+
+        def mock_objects(self, gcs, blob):
+            self.counter += 1
+            return json.dumps(
+                dict(job_id='gcf-ingest-',
+                     table='',
+                     retry_attempt_cnt=self.counter))
+
+    mock_read_gcs_file_if_exists = MockReadGcsFileIfExists()
+    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = mock_read_gcs_file_if_exists.mock_objects
+
+    gcs_ocn_bq_ingest.common.utils.get_table_prefix = Mock()
+
+    backfill_blob = Mock(spec=storage.Blob)
+    backfill_blob.name = 'backfill_blob'
+    backfill_blob.bucket.name = 'bucket'
+
+    with pytest.raises(gcs_ocn_bq_ingest.common.exceptions.BigQueryJobFailure):
+        gcs_ocn_bq_ingest.common.ordering.backlog_subscriber(
+            gcs_client, bq_client, backfill_blob, time.monotonic())
+    max_num_retries = gcs_ocn_bq_ingest.common.constants.NUM_RETRIES_FOR_BIGQUERY_INTERNAL_ERRORS
+    assert bq_client.get_job.call_count == max_num_retries
+    assert bq_job.exception.call_count == max_num_retries
+    assert mock_read_gcs_file_if_exists.counter == max_num_retries
