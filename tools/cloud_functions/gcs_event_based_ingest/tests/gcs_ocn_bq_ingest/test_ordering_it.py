@@ -13,6 +13,7 @@
 # limitations under the License.
 """integration tests for the ordering behavior of backlog gcs_ocn_bq_ingest"""
 import importlib
+import json
 import multiprocessing
 import os
 import queue
@@ -21,6 +22,7 @@ from typing import List, Optional
 from unittest.mock import Mock
 from unittest.mock import patch
 
+import google.api_core.exceptions
 import pytest
 from google.cloud import bigquery
 from google.cloud import storage
@@ -546,9 +548,6 @@ def _post_a_new_batch(gcs_bucket, dest_ordered_update_table):
 
 @patch('google.cloud.bigquery.TableReference')
 def test_bq_internal_failure(mock_table_reference):
-    import json
-
-    import google.api_core.exceptions
     test_table = Mock()
     test_table.to_api_repr.return_value = {
         'table': 'projectId.datasetId.tableId'
