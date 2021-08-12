@@ -31,7 +31,7 @@ def log_bigquery_job(job: Union[bigquery.LoadJob, bigquery.QueryJob],
     :param message:
     :param severity:
     """
-    if job.errors:
+    if job.error_result:
         severity = "ERROR"
         message = message or "BigQuery Job had errors."
     elif severity == "ERROR":
@@ -48,7 +48,7 @@ def log_bigquery_job(job: Union[bigquery.LoadJob, bigquery.QueryJob],
                 severity=severity,
                 job=job.to_api_repr(),
                 table=table.to_api_repr(),
-                errors=job.errors,
+                errors=job.error_result,
             )))
 
 
