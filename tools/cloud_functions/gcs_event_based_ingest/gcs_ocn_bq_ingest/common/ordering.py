@@ -216,12 +216,14 @@ def wait_on_last_job(gcs_client: storage.client, bq_client: bigquery.Client,
         return utils.wait_on_bq_job_id(bq_client, job_id, table,
                                        polling_timeout)
     except (exceptions.BigQueryJobFailure, google.api_core.exceptions.NotFound,
-            google.api_core.exceptions.ServerError) as err:
-        # Retry all internal 5xx errors up to user-defined limit
-        # set in NUM_RETRIES_FOR_BIGQUERY_INTERNAL_ERRORS constant
-        if isinstance(err, google.api_core.exceptions.ServerError):
+            google.api_core.exceptions.ServerError,
+            google.api_core.exceptions.BadRequest) as err:
+        # Retry all internal 5xx and 400 errors up to user-defined limit
+        # set in MAX_RETRIES_ON_BIGQUERY_ERROR constant
+        if (isinstance(err, google.api_core.exceptions.ServerError) or
+                isinstance(err, google.api_core.exceptions.BadRequest)):
             retry_attempt_cnt += 1  # Increment the retry count
-            if retry_attempt_cnt <= constants.NUM_RETRIES_FOR_BIGQUERY_INTERNAL_ERRORS:
+            if retry_attempt_cnt <= constants.MAX_RETRIES_ON_BIGQUERY_ERROR:
                 utils.handle_bq_lock(gcs_client,
                                      lock_blob,
                                      job_id,

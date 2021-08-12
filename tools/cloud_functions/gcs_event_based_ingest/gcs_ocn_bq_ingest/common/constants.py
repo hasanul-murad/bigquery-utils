@@ -149,4 +149,5 @@ NON_BQ_JOB_ID_REGEX = r'[^0-9a-zA-Z_\-]+'
 WAIT_FOR_VALIDATION = bool(
     distutils.util.strtobool(os.getenv("WAIT_FOR_VALIDATION", "False")))
 
-NUM_RETRIES_FOR_BIGQUERY_INTERNAL_ERRORS = 3
+MAX_RETRIES_ON_BIGQUERY_ERROR = int(
+    os.getenv("MAX_RETRIES_ON_BIGQUERY_ERROR", "3"))

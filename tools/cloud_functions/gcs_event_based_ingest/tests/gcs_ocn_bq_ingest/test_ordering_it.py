@@ -547,7 +547,7 @@ def _post_a_new_batch(gcs_bucket, dest_ordered_update_table):
 
 
 @patch('google.cloud.bigquery.TableReference')
-def test_retries_on_bq_internal_failure(mock_table_reference):
+def test_retries_on_bq_query_failure(mock_table_reference):
     test_table = Mock()
     test_table.to_api_repr.return_value = {
         'table': 'projectId.datasetId.tableId'
@@ -559,7 +559,7 @@ def test_retries_on_bq_internal_failure(mock_table_reference):
     bq_job.to_api_repr.return_value = 'job'
     bq_job.job_id = 'job_id'
     bq_job.state = "DONE"
-    bq_job.errors = 'Internal Error'
+    bq_job.error_result = 'Internal Error'
     external_table = Mock(spec=bigquery.ExternalConfig)
     external_table.to_api_repr.return_value = {'external_table': 'mock'}
     external_table._properties = {'some prop': 'some'}
@@ -594,7 +594,7 @@ def test_retries_on_bq_internal_failure(mock_table_reference):
     with pytest.raises(gcs_ocn_bq_ingest.common.exceptions.BigQueryJobFailure):
         gcs_ocn_bq_ingest.common.ordering.backlog_subscriber(
             gcs_client, bq_client, backfill_blob, time.monotonic())
-    max_num_retries = gcs_ocn_bq_ingest.common.constants.NUM_RETRIES_FOR_BIGQUERY_INTERNAL_ERRORS
+    max_num_retries = gcs_ocn_bq_ingest.common.constants.MAX_RETRIES_ON_BIGQUERY_ERROR
     assert bq_client.query.call_count == max_num_retries
     # We expect twice the amount of get_job calls because wait_on_bq_job_id()
     # and retry_query() both make calls to get_job
