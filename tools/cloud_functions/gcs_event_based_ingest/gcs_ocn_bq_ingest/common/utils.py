@@ -716,7 +716,7 @@ def check_for_bq_job_and_children_errors(
     """
     if job.state != "DONE":
         wait_on_bq_job_id(bq_client, job.job_id, table, 5)
-    if job.errors or job.error_result:
+    if job.error_result:
         logging.log_bigquery_job(job, table)
         # Raise any 5xx error codes
         exception: Optional[
@@ -725,7 +725,7 @@ def check_for_bq_job_and_children_errors(
             raise exception
         raise exceptions.BigQueryJobFailure(
             f"BigQuery Job {job.job_id} failed during backfill with the "
-            f"following errors: {job.errors} "
+            f"following errors: {job.error_result} "
             f"{pprint.pformat(job.to_api_repr())}")
     if isinstance(job, bigquery.QueryJob):
         if (constants.FAIL_ON_ZERO_DML_ROWS_AFFECTED and
