@@ -961,7 +961,14 @@ def create_job_id(success_file_path, data_source_name=None, table=None):
         # republished (e.g. to fix a bad batch of data) or handle multiple load jobs
         # for a single success file.
         clean_job_id += str(uuid.uuid4())
-    return clean_job_id[:1024]  # make sure job id isn't too long
+    # Make sure job id isn't too long (1024 chars max), but also leave 3 chars of space so that if a job fails
+    # we can add a retry counter suffix to the original job_id.
+    # For example, if 'some_job_id' fails, then on the third retry we'd see the following job id:
+    #   some_job_id_03
+    # where _03 means the third retry attempt.
+    #
+    # Source for job id max length: https://cloud.google.com/bigquery/docs/running-jobs#generate-jobid
+    return clean_job_id[:1021]
 
 
 def handle_bq_lock(gcs_client: storage.Client,
