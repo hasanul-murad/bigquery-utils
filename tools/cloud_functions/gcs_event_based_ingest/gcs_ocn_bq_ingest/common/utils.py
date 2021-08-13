@@ -766,10 +766,9 @@ def wait_on_bq_job_id(bq_client: bigquery.Client,
         exceptions.BigQueryJobFailure if the job failed.
         google.api_core.exceptions.NotFound if the job id cannot be found.
     """
+    job: Union[bigquery.LoadJob, bigquery.QueryJob] = bq_client.get_job(job_id)
     start_poll = time.monotonic()
     while time.monotonic() - start_poll < (polling_timeout - polling_interval):
-        job: Union[bigquery.LoadJob,
-                   bigquery.QueryJob] = bq_client.get_job(job_id)
         if job.state == "DONE":
             check_for_bq_job_and_children_errors(bq_client, job, table)
             return True
@@ -777,6 +776,7 @@ def wait_on_bq_job_id(bq_client: bigquery.Client,
             logging.log_bigquery_job(job, table,
                                      f"Waiting on BigQuery Job {job.job_id=}")
             time.sleep(polling_interval)
+        job = bq_client.get_job(job_id)
     logging.log_bigquery_job(
         job, table,
         f"Reached polling timeout waiting for bigquery job {job.job_id=}.",
