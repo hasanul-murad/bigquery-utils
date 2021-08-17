@@ -721,7 +721,9 @@ def check_for_bq_job_and_children_errors(
         # Raise any 5xx error codes
         exception: Optional[
             google.api_core.exceptions.GoogleAPICallError] = job.exception()
-        if isinstance(exception, google.api_core.exceptions.ServerError):
+        if (isinstance(exception, google.api_core.exceptions.ServerError) or
+                isinstance(exception, google.api_core.exceptions.BadRequest)):
+            # Raise these two exception types so that the job can be retried
             raise exception
         raise exceptions.BigQueryJobFailure(
             f"BigQuery Job {job.job_id} failed during backfill with the "
@@ -984,6 +986,11 @@ def handle_bq_lock(gcs_client: storage.Client,
                 dict(job_id=next_job_id,
                      table=table.to_api_repr(),
                      retry_attempt_cnt=retry_attempt_cnt))
+            logging.log_with_table(
+                table,
+                f"Writing the following content to lock_blob {lock_blob.name}:"
+                f" {dict(job_id=next_job_id, table=table.to_api_repr(), retry_attempt_cnt=retry_attempt_cnt)}"
+            )
             if lock_blob.exists(client=gcs_client):
                 lock_blob.upload_from_string(
                     lock_blob_contents,

@@ -557,13 +557,13 @@ def test_retries_on_bq_query_failure(mock_table_reference):
     bq_client = Mock(spec=bigquery.Client)
     bq_job = Mock(spec=bigquery.QueryJob)
     bq_job.to_api_repr.return_value = 'job'
-    bq_job.job_id = 'job_id'
     bq_job.state = "DONE"
     bq_job.error_result = 'Internal Error'
     external_table = Mock(spec=bigquery.ExternalConfig)
     external_table.to_api_repr.return_value = {'external_table': 'mock'}
     external_table._properties = {'some prop': 'some'}
     bq_job.table_definitions = {'tableA': external_table}
+    # Test that 5xx internal errors are retried
     bq_job.exception.return_value = google.api_core.exceptions.ServerError(
         'Internal Error')
     bq_client.get_job.return_value = bq_job
@@ -590,6 +590,25 @@ def test_retries_on_bq_query_failure(mock_table_reference):
     backfill_blob = Mock(spec=storage.Blob)
     backfill_blob.name = 'backfill_blob'
     backfill_blob.bucket.name = 'bucket'
+
+    with pytest.raises(gcs_ocn_bq_ingest.common.exceptions.BigQueryJobFailure):
+        gcs_ocn_bq_ingest.common.ordering.backlog_subscriber(
+            gcs_client, bq_client, backfill_blob, time.monotonic())
+    max_num_retries = gcs_ocn_bq_ingest.common.constants.MAX_RETRIES_ON_BIGQUERY_ERROR
+    assert bq_client.query.call_count == max_num_retries
+    # We expect twice the amount of get_job calls because wait_on_bq_job_id()
+    # and retry_query() both make calls to get_job
+    assert bq_client.get_job.call_count == max_num_retries * 2
+    assert bq_job.exception.call_count == max_num_retries
+    assert mock_read_gcs_file_if_exists.counter == max_num_retries
+
+    # Now test that 400 Bad Request Error is retried
+    bq_job.exception.return_value = google.api_core.exceptions.BadRequest(
+        'Bad Request Error')
+    mock_read_gcs_file_if_exists = MockReadGcsFileIfExists()
+    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = mock_read_gcs_file_if_exists.mock_objects
+    bq_job.reset_mock()
+    bq_client.reset_mock()
 
     with pytest.raises(gcs_ocn_bq_ingest.common.exceptions.BigQueryJobFailure):
         gcs_ocn_bq_ingest.common.ordering.backlog_subscriber(

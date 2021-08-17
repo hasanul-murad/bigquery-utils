@@ -102,7 +102,6 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
             "setting the timeout to 540 seconds or at least "
             "1 minute (Cloud Functions default).")
     while time.monotonic() < restart_time - polling_timeout - 1:
-        retry_attempt_cnt: int = 0
         first_bq_lock_claim = False
         lock_contents_str = utils.read_gcs_file_if_exists(
             gcs_client, f"gs://{bkt.name}/{lock_blob.name}")
@@ -128,7 +127,7 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
                         # kept in the _bqlock lock file.
                         if lock_contents.get('retry_attempt_cnt'):
                             retry_job_id = f"{job_id}_{lock_contents.get('retry_attempt_cnt')}"
-                            retry_attempt_cnt = int(
+                            retry_attempt_cnt: int = int(
                                 lock_contents['retry_attempt_cnt'])
                             retry_query(gcs_client, bq_client, lock_blob,
                                         job_id, retry_job_id, table,
@@ -182,13 +181,12 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
                       f"the _backlog items.")
                 return
 
-        if retry_attempt_cnt == 0:
-            # Submit the next item in the _backlog if it is non-empty or
-            # clean up the _BACKFILL and _bqlock files
-            should_subscriber_exit = handle_backlog(gcs_client, bq_client, bkt,
-                                                    lock_blob, backfill_blob)
-            if should_subscriber_exit:
-                return
+        # Submit the next item in the _backlog if it is non-empty or
+        # clean up the _BACKFILL and _bqlock files
+        should_subscriber_exit = handle_backlog(gcs_client, bq_client, bkt,
+                                                lock_blob, backfill_blob)
+        if should_subscriber_exit:
+            return
     # re-trigger the subscriber loop by reposting the _BACKFILL file
     print("ran out of time, restarting backfill subscriber loop for:"
           f"gs://{bkt.name}/{table_prefix}")
