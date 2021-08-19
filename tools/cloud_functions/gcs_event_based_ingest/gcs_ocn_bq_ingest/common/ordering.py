@@ -56,20 +56,28 @@ def backlog_publisher(
 
 
 def retry_query(gcs_client: storage.Client, bq_client: bigquery.Client,
-                lock_blob: storage.Blob, failed_job_id: Union[bigquery.QueryJob,
-                                                              bigquery.LoadJob],
-                retry_job_id: str, table: bigquery.TableReference,
-                retry_attempt_cnt):
+                lock_blob: storage.Blob, failed_job_id: str,
+                table: bigquery.TableReference, retry_attempt_cnt):
+    if retry_attempt_cnt > 1:
+        retry_job_id = f"{failed_job_id[:-3]}_{retry_attempt_cnt:02}"  # pad with zero
+    else:
+        retry_job_id = f"{failed_job_id}_{retry_attempt_cnt:02}"  # pad with zero
     failed_job: bigquery.QueryJob = bq_client.get_job(failed_job_id)
     job_config: bigquery.QueryJobConfig = bigquery.QueryJobConfig(
         table_definitions=failed_job.table_definitions, use_legacy_sql=False)
     retry_job = bq_client.query(failed_job.query,
                                 job_config=job_config,
                                 job_id=retry_job_id)
+    # To keep track of retry attempts between cloud
+    # function invocations, the retry count state is
+    # kept in the _bqlock lock file.
+    utils.handle_bq_lock(gcs_client,
+                         lock_blob,
+                         retry_job_id,
+                         table,
+                         retry_attempt_cnt=retry_attempt_cnt)
     logging.log_bigquery_job(
         retry_job, table, f"Submitted asynchronous query job: {retry_job_id}")
-    utils.handle_bq_lock(gcs_client, lock_blob, retry_job_id, table,
-                         retry_attempt_cnt)
 
 
 def backlog_subscriber(gcs_client: Optional[storage.Client],
@@ -126,15 +134,11 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
                         # function invocations, the retry count state is
                         # kept in the _bqlock lock file.
                         if lock_contents.get('retry_attempt_cnt'):
-                            retry_job_id = f"{job_id}_{lock_contents.get('retry_attempt_cnt')}"
                             retry_attempt_cnt: int = int(
                                 lock_contents['retry_attempt_cnt'])
-                            retry_query(gcs_client, bq_client, lock_blob,
-                                        job_id, retry_job_id, table,
-                                        retry_attempt_cnt)
                             last_job_done = wait_on_last_job(
                                 gcs_client, bq_client, lock_blob, backfill_blob,
-                                retry_job_id, table, polling_timeout,
+                                job_id, table, polling_timeout,
                                 retry_attempt_cnt)
                         else:
                             last_job_done = wait_on_last_job(
@@ -222,11 +226,14 @@ def wait_on_last_job(gcs_client: storage.client, bq_client: bigquery.Client,
                 isinstance(err, google.api_core.exceptions.BadRequest)):
             retry_attempt_cnt += 1  # Increment the retry count
             if retry_attempt_cnt <= constants.MAX_RETRIES_ON_BIGQUERY_ERROR:
-                utils.handle_bq_lock(gcs_client,
-                                     lock_blob,
-                                     job_id,
-                                     table,
-                                     retry_attempt_cnt=retry_attempt_cnt)
+                logging.log_with_table(
+                    table,
+                    f"Retrying query due to retry-able error: {err}\n"
+                    f"This is {retry_attempt_cnt=}"
+                )
+                retry_query(gcs_client, bq_client, lock_blob,
+                            job_id, table,
+                            retry_attempt_cnt)
                 return False
             else:
                 # Reaching this point means all retries on 5xx errors have

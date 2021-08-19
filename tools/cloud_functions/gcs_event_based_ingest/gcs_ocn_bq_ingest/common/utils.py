@@ -591,6 +591,7 @@ def get_table_from_load_job_config(config: bigquery.LoadJobConfig):
     :param config: bigquery.LoadJobConfig
     :return: bigquery.TableReference
     """
+    print(f"Retrieving table for LoadJobConfig: {config.to_api_repr()}")
     if config.to_api_repr().get('load'):
         config = config.to_api_repr().get('load')
         if config.get('destinationTable'):
@@ -908,6 +909,7 @@ def gcs_path_to_load_config_and_datasource_name(
         # /v2/Job#jobconfigurationload
         if data_source_name:
             load_config.pop('dataSourceName')
+        print(f"Building LoadJobConfig from {load_config=}")
         bq_load_config: bigquery.LoadJobConfig = (
             bigquery.LoadJobConfig.from_api_repr({'load': load_config}))
         bq_load_config.labels = constants.DEFAULT_JOB_LABELS

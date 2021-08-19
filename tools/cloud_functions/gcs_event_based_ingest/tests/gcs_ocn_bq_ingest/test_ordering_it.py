@@ -569,22 +569,33 @@ def test_retries_on_bq_query_failure(mock_table_reference):
     bq_client.get_job.return_value = bq_job
     bq_client.query.return_value = bq_job
 
-    class MockReadGcsFileIfExists(Mock):
-
-        def __init__(self):
+    class MockCloudFunction(Mock):
+        def __init__(self, job, table):
             super().__init__()
-            self.counter = 0
+            self.retry_attempt_cnt = 0
+            self.job_id = 'gcf-ingest-job-id'
+            self.job = job
+            self.table = table
 
-        def mock_objects(self, gcs, blob):
-            self.counter += 1
-            return json.dumps(
-                dict(job_id='gcf-ingest-',
-                     table='',
-                     retry_attempt_cnt=self.counter))
+        def read_gcs_file_if_exists(self, gcs, blob):
+            lock_contents = json.dumps(
+                dict(job_id=self.job_id,
+                     table=self.table.to_api_repr(),
+                     retry_attempt_cnt=self.retry_attempt_cnt))
+            return lock_contents
 
-    mock_read_gcs_file_if_exists = MockReadGcsFileIfExists()
-    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = mock_read_gcs_file_if_exists.mock_objects
+        def mock_handle_bq_lock(self, gcs,
+                                lock_blob,
+                                retry_job_id,
+                                table,
+                                retry_attempt_cnt):
+            self.job_id = retry_job_id
+            self.table = table
+            self.retry_attempt_cnt = retry_attempt_cnt
 
+    mock_cloud_function = MockCloudFunction(bq_job, test_table)
+    gcs_ocn_bq_ingest.common.utils.handle_bq_lock = mock_cloud_function.mock_handle_bq_lock
+    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = mock_cloud_function.read_gcs_file_if_exists
     gcs_ocn_bq_ingest.common.utils.get_table_prefix = Mock()
 
     backfill_blob = Mock(spec=storage.Blob)
@@ -595,18 +606,21 @@ def test_retries_on_bq_query_failure(mock_table_reference):
         gcs_ocn_bq_ingest.common.ordering.backlog_subscriber(
             gcs_client, bq_client, backfill_blob, time.monotonic())
     max_num_retries = gcs_ocn_bq_ingest.common.constants.MAX_RETRIES_ON_BIGQUERY_ERROR
-    assert bq_client.query.call_count == max_num_retries
     # We expect twice the amount of get_job calls because wait_on_bq_job_id()
-    # and retry_query() both make calls to get_job
-    assert bq_client.get_job.call_count == max_num_retries * 2
-    assert bq_job.exception.call_count == max_num_retries
-    assert mock_read_gcs_file_if_exists.counter == max_num_retries
+    # and retry_query() both make calls to get_job.
+    # One additional call to all the below are also expected
+    # in addition to max_num_retries because of the first time
+    # a query executes before retries.
+    assert bq_client.get_job.call_count == max_num_retries * 2 + 1
+    assert bq_job.exception.call_count == max_num_retries + 1
+    assert mock_cloud_function.retry_attempt_cnt == max_num_retries + 1
 
     # Now test that 400 Bad Request Error is retried
     bq_job.exception.return_value = google.api_core.exceptions.BadRequest(
         'Bad Request Error')
-    mock_read_gcs_file_if_exists = MockReadGcsFileIfExists()
-    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = mock_read_gcs_file_if_exists.mock_objects
+    mock_cloud_function = MockCloudFunction(bq_job, test_table)
+    gcs_ocn_bq_ingest.common.utils.handle_bq_lock = mock_cloud_function.mock_handle_bq_lock
+    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = mock_cloud_function.read_gcs_file_if_exists
     bq_job.reset_mock()
     bq_client.reset_mock()
 
@@ -614,9 +628,11 @@ def test_retries_on_bq_query_failure(mock_table_reference):
         gcs_ocn_bq_ingest.common.ordering.backlog_subscriber(
             gcs_client, bq_client, backfill_blob, time.monotonic())
     max_num_retries = gcs_ocn_bq_ingest.common.constants.MAX_RETRIES_ON_BIGQUERY_ERROR
-    assert bq_client.query.call_count == max_num_retries
     # We expect twice the amount of get_job calls because wait_on_bq_job_id()
-    # and retry_query() both make calls to get_job
-    assert bq_client.get_job.call_count == max_num_retries * 2
-    assert bq_job.exception.call_count == max_num_retries
-    assert mock_read_gcs_file_if_exists.counter == max_num_retries
+    # and retry_query() both make calls to get_job.
+    # One additional call to all the below are also expected
+    # in addition to max_num_retries because of the first time
+    # a query executes before retries.
+    assert bq_client.get_job.call_count == max_num_retries * 2 + 1
+    assert bq_job.exception.call_count == max_num_retries + 1
+    assert mock_cloud_function.retry_attempt_cnt == max_num_retries + 1
