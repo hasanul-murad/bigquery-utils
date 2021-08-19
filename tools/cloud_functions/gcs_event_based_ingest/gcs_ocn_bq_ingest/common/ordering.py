@@ -114,8 +114,6 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
         lock_contents_str = utils.read_gcs_file_if_exists(
             gcs_client, f"gs://{bkt.name}/{lock_blob.name}")
         if lock_contents_str:
-            # is this a lock placed by this cloud function.
-            # the else will handle a manual _bqlock
             lock_contents: Dict = json.loads(lock_contents_str)
             if lock_contents:
                 print(
@@ -127,6 +125,8 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
                 table = bigquery.TableReference.from_api_repr(
                     lock_contents.get('table'))
                 if job_id and table:
+                    # is this a lock placed by this cloud function.
+                    # the else will handle a manual _bqlock
                     if job_id.startswith(
                             os.getenv('JOB_PREFIX',
                                       constants.DEFAULT_JOB_PREFIX)):
@@ -148,9 +148,9 @@ def backlog_subscriber(gcs_client: Optional[storage.Client],
                         print(
                             f"sleeping for {polling_timeout} seconds because"
                             f"found manual lock gs://{bkt.name}/{lock_blob.name} with"
+                            f"manual lock contents: {lock_contents}. "
                             "This will be an infinite loop until the manual lock is "
-                            "released. "
-                            f"manual lock contents: {lock_contents}. ")
+                            "released. ")
                         time.sleep(polling_timeout)
                         continue
         else:  # this condition handles absence of _bqlock file
@@ -227,12 +227,9 @@ def wait_on_last_job(gcs_client: storage.client, bq_client: bigquery.Client,
             retry_attempt_cnt += 1  # Increment the retry count
             if retry_attempt_cnt <= constants.MAX_RETRIES_ON_BIGQUERY_ERROR:
                 logging.log_with_table(
-                    table,
-                    f"Retrying query due to retry-able error: {err}\n"
-                    f"This is {retry_attempt_cnt=}"
-                )
-                retry_query(gcs_client, bq_client, lock_blob,
-                            job_id, table,
+                    table, f"Retrying query due to retry-able error: {err}\n"
+                    f"This is {retry_attempt_cnt=}")
+                retry_query(gcs_client, bq_client, lock_blob, job_id, table,
                             retry_attempt_cnt)
                 return False
             else:

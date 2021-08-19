@@ -570,6 +570,7 @@ def test_retries_on_bq_query_failure(mock_table_reference):
     bq_client.query.return_value = bq_job
 
     class MockCloudFunction(Mock):
+
         def __init__(self, job, table):
             super().__init__()
             self.retry_attempt_cnt = 0
@@ -584,10 +585,7 @@ def test_retries_on_bq_query_failure(mock_table_reference):
                      retry_attempt_cnt=self.retry_attempt_cnt))
             return lock_contents
 
-        def mock_handle_bq_lock(self, gcs,
-                                lock_blob,
-                                retry_job_id,
-                                table,
+        def mock_handle_bq_lock(self, gcs, lock_blob, retry_job_id, table,
                                 retry_attempt_cnt):
             self.job_id = retry_job_id
             self.table = table
