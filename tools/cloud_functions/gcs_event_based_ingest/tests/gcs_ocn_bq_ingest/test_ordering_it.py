@@ -20,6 +20,7 @@ import queue
 import time
 from typing import List, Optional
 from unittest.mock import Mock
+from unittest.mock import PropertyMock
 from unittest.mock import patch
 
 import google.api_core.exceptions
@@ -546,91 +547,166 @@ def _post_a_new_batch(gcs_bucket, dest_ordered_update_table):
     return gcs_ocn_bq_ingest.common.ordering.backlog_publisher(gcs, data_obj)
 
 
+class MockCloudFunctionMethods(Mock):
+
+    def __init__(self, job, table):
+        super().__init__()
+        self.retry_attempt_cnt = 0
+        self.job_id = 'gcf-ingest-job-id'
+        self.job = job
+        self.table = table
+
+    def reset(self):
+        self.retry_attempt_cnt = 0
+        self.job_id = 'gcf-ingest-job-id'
+
+    def read_gcs_file_if_exists(self, gcs, blob):
+        lock_contents = json.dumps(
+            dict(job_id=self.job_id,
+                 table=self.table.to_api_repr(),
+                 retry_attempt_cnt=self.retry_attempt_cnt))
+        return lock_contents
+
+    def mock_handle_bq_lock(self,
+                            gcs,
+                            lock_blob,
+                            retry_job_id,
+                            table,
+                            retry_attempt_cnt=None):
+        self.job_id = retry_job_id
+        self.table = table
+        self.retry_attempt_cnt = retry_attempt_cnt
+
+
+@patch('google.cloud.bigquery.QueryJobConfig')
+@patch('gcs_ocn_bq_ingest.common.utils.get_table_prefix')
+@patch('google.cloud.storage.Blob')
 @patch('google.cloud.bigquery.TableReference')
-def test_retries_on_bq_query_failure(mock_table_reference):
+@patch('google.cloud.bigquery.Client')
+@patch('google.cloud.storage.Client')
+def test_query_max_retries_on_bad_request_failure(gcs_client, bq_client,
+                                                  mock_table_reference,
+                                                  backfill_blob,
+                                                  get_table_prefix,
+                                                  query_job_config):
     test_table = Mock()
     test_table.to_api_repr.return_value = {
         'table': 'projectId.datasetId.tableId'
     }
     mock_table_reference.from_api_repr.return_value = test_table
-    gcs_client = Mock(spec=storage.Client)
-    bq_client = Mock(spec=bigquery.Client)
     bq_job = Mock(spec=bigquery.QueryJob)
     bq_job.to_api_repr.return_value = 'job'
-    bq_job.state = "DONE"
-    bq_job.error_result = 'Internal Error'
-    external_table = Mock(spec=bigquery.ExternalConfig)
-    external_table.to_api_repr.return_value = {'external_table': 'mock'}
-    external_table._properties = {'some prop': 'some'}
-    bq_job.table_definitions = {'tableA': external_table}
-    # Test that 5xx internal errors are retried
-    bq_job.exception.return_value = google.api_core.exceptions.ServerError(
-        'Internal Error')
+    bq_job.state = 'DONE'
     bq_client.get_job.return_value = bq_job
     bq_client.query.return_value = bq_job
 
-    class MockCloudFunction(Mock):
+    mock_cloud_function_methods = MockCloudFunctionMethods(bq_job, test_table)
+    gcs_ocn_bq_ingest.common.utils.handle_bq_lock = (
+        mock_cloud_function_methods.mock_handle_bq_lock)
+    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = (
+        mock_cloud_function_methods.read_gcs_file_if_exists)
 
-        def __init__(self, job, table):
-            super().__init__()
-            self.retry_attempt_cnt = 0
-            self.job_id = 'gcf-ingest-job-id'
-            self.job = job
-            self.table = table
-
-        def read_gcs_file_if_exists(self, gcs, blob):
-            lock_contents = json.dumps(
-                dict(job_id=self.job_id,
-                     table=self.table.to_api_repr(),
-                     retry_attempt_cnt=self.retry_attempt_cnt))
-            return lock_contents
-
-        def mock_handle_bq_lock(self, gcs, lock_blob, retry_job_id, table,
-                                retry_attempt_cnt):
-            self.job_id = retry_job_id
-            self.table = table
-            self.retry_attempt_cnt = retry_attempt_cnt
-
-    mock_cloud_function = MockCloudFunction(bq_job, test_table)
-    gcs_ocn_bq_ingest.common.utils.handle_bq_lock = mock_cloud_function.mock_handle_bq_lock
-    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = mock_cloud_function.read_gcs_file_if_exists
-    gcs_ocn_bq_ingest.common.utils.get_table_prefix = Mock()
-
-    backfill_blob = Mock(spec=storage.Blob)
     backfill_blob.name = 'backfill_blob'
     backfill_blob.bucket.name = 'bucket'
 
-    with pytest.raises(gcs_ocn_bq_ingest.common.exceptions.BigQueryJobFailure):
-        gcs_ocn_bq_ingest.common.ordering.backlog_subscriber(
-            gcs_client, bq_client, backfill_blob, time.monotonic())
-    max_num_retries = gcs_ocn_bq_ingest.common.constants.MAX_RETRIES_ON_BIGQUERY_ERROR
-    # We expect twice the amount of get_job calls because wait_on_bq_job_id()
-    # and retry_query() both make calls to get_job.
-    # One additional call to all the below are also expected
-    # in addition to max_num_retries because of the first time
-    # a query executes before retries.
-    assert bq_client.get_job.call_count == max_num_retries * 2 + 1
-    assert bq_job.exception.call_count == max_num_retries + 1
-    assert mock_cloud_function.retry_attempt_cnt == max_num_retries + 1
-
     # Now test that 400 Bad Request Error is retried
-    bq_job.exception.return_value = google.api_core.exceptions.BadRequest(
-        'Bad Request Error')
-    mock_cloud_function = MockCloudFunction(bq_job, test_table)
-    gcs_ocn_bq_ingest.common.utils.handle_bq_lock = mock_cloud_function.mock_handle_bq_lock
-    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = mock_cloud_function.read_gcs_file_if_exists
-    bq_job.reset_mock()
-    bq_client.reset_mock()
-
+    bq_job.exception.side_effect = google.api_core.exceptions.BadRequest(
+        'BadRequest')
+    bq_job.error_result = 'BadRequest'
+    # Verify that a BigQueryJobFailure exception is raised after the failing query
+    # is retried the max amount of times.
     with pytest.raises(gcs_ocn_bq_ingest.common.exceptions.BigQueryJobFailure):
         gcs_ocn_bq_ingest.common.ordering.backlog_subscriber(
             gcs_client, bq_client, backfill_blob, time.monotonic())
+    # Verify that query was only retried the max specified in MAX_RETRIES_ON_BIGQUERY_ERROR
+    assert bq_client.query.call_count == gcs_ocn_bq_ingest.common.constants.MAX_RETRIES_ON_BIGQUERY_ERROR
+
+
+@patch('google.cloud.bigquery.QueryJobConfig')
+@patch('gcs_ocn_bq_ingest.common.utils.get_table_prefix')
+@patch('google.cloud.storage.Blob')
+@patch('google.cloud.bigquery.TableReference')
+@patch('google.cloud.bigquery.Client')
+@patch('google.cloud.storage.Client')
+def test_query_max_retries_on_internal_failure(gcs_client, bq_client,
+                                               mock_table_reference,
+                                               backfill_blob, get_table_prefix,
+                                               query_job_config):
+    test_table = Mock()
+    test_table.to_api_repr.return_value = {
+        'table': 'projectId.datasetId.tableId'
+    }
+    mock_table_reference.from_api_repr.return_value = test_table
+    bq_job = Mock(spec=bigquery.QueryJob)
+    bq_job.to_api_repr.return_value = 'job'
+    bq_job.state = 'DONE'
+    bq_client.get_job.return_value = bq_job
+    bq_client.query.return_value = bq_job
+
+    mock_cloud_function_methods = MockCloudFunctionMethods(bq_job, test_table)
+    gcs_ocn_bq_ingest.common.utils.handle_bq_lock = (
+        mock_cloud_function_methods.mock_handle_bq_lock)
+    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = (
+        mock_cloud_function_methods.read_gcs_file_if_exists)
+
+    backfill_blob.name = 'backfill_blob'
+    backfill_blob.bucket.name = 'bucket'
+
+    # Test that 5xx internal errors are retried
+    bq_job.exception.side_effect = google.api_core.exceptions.ServerError(
+        'Internal Error')
+    bq_job.error_result = 'Internal Error'
+    # Verify that a BigQueryJobFailure exception is raised after the failing query
+    # is retried the max amount of times.
+    with pytest.raises(gcs_ocn_bq_ingest.common.exceptions.BigQueryJobFailure):
+        gcs_ocn_bq_ingest.common.ordering.backlog_subscriber(
+            gcs_client, bq_client, backfill_blob, time.monotonic())
+    # Verify that query was only retried the max specified in MAX_RETRIES_ON_BIGQUERY_ERROR
+    assert bq_client.query.call_count == gcs_ocn_bq_ingest.common.constants.MAX_RETRIES_ON_BIGQUERY_ERROR
+
+
+@patch('google.cloud.bigquery.QueryJobConfig')
+@patch('gcs_ocn_bq_ingest.common.utils.get_table_prefix')
+@patch('google.cloud.storage.Blob')
+@patch('google.cloud.bigquery.TableReference')
+@patch('google.cloud.bigquery.Client')
+@patch('google.cloud.storage.Client')
+def test_query_success_on_last_retry(gcs_client, bq_client,
+                                     mock_table_reference, backfill_blob,
+                                     get_table_prefix, query_job_config):
+    test_table = Mock()
+    test_table.to_api_repr.return_value = {
+        'table': 'projectId.datasetId.tableId'
+    }
+    mock_table_reference.from_api_repr.return_value = test_table
+    bq_job = Mock(spec=bigquery.QueryJob)
+    bq_job.to_api_repr.return_value = 'job'
+    bq_job.state = 'DONE'
+    bq_client.get_job.return_value = bq_job
+    bq_client.query.return_value = bq_job
+
+    mock_cloud_function_methods = MockCloudFunctionMethods(bq_job, test_table)
+    gcs_ocn_bq_ingest.common.utils.handle_bq_lock = (
+        mock_cloud_function_methods.mock_handle_bq_lock)
+    gcs_ocn_bq_ingest.common.utils.read_gcs_file_if_exists = (
+        mock_cloud_function_methods.read_gcs_file_if_exists)
+
+    backfill_blob.name = 'backfill_blob'
+    backfill_blob.bucket.name = 'bucket'
     max_num_retries = gcs_ocn_bq_ingest.common.constants.MAX_RETRIES_ON_BIGQUERY_ERROR
-    # We expect twice the amount of get_job calls because wait_on_bq_job_id()
-    # and retry_query() both make calls to get_job.
-    # One additional call to all the below are also expected
-    # in addition to max_num_retries because of the first time
-    # a query executes before retries.
-    assert bq_client.get_job.call_count == max_num_retries * 2 + 1
-    assert bq_job.exception.call_count == max_num_retries + 1
-    assert mock_cloud_function.retry_attempt_cnt == max_num_retries + 1
+
+    # This test simulates a scenario where the
+    # last retry attempt MAX_RETRIES_ON_BIGQUERY_ERROR-1 succeeds
+    bq_job.exception.side_effect = google.api_core.exceptions.ServerError(
+        'Internal Error')
+    # Initialize an array of values to be passed whenever job.error_results property is accessed
+    failure_result = ['Internal Error'] * ((max_num_retries - 1) * 6 + 1)
+    success_result = [None] * max_num_retries
+    mocked_query_results = failure_result + success_result
+    type(bq_job).error_result = PropertyMock(side_effect=mocked_query_results)
+
+    gcs_ocn_bq_ingest.common.ordering.backlog_subscriber(
+        gcs_client, bq_client, backfill_blob, time.monotonic())
+    # The last retry succeeds so verify that query was
+    # retried the max specified in MAX_RETRIES_ON_BIGQUERY_ERROR
+    assert bq_client.query.call_count == gcs_ocn_bq_ingest.common.constants.MAX_RETRIES_ON_BIGQUERY_ERROR

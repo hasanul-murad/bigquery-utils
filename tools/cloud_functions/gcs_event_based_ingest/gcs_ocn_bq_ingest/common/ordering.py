@@ -21,7 +21,7 @@ import json
 import os
 import time
 import traceback
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple
 
 import google.api_core
 import google.api_core.exceptions
@@ -58,7 +58,10 @@ def backlog_publisher(
 def retry_query(gcs_client: storage.Client, bq_client: bigquery.Client,
                 lock_blob: storage.Blob, failed_job_id: str,
                 table: bigquery.TableReference, retry_attempt_cnt):
+    """Retry a query that failed"""
     if retry_attempt_cnt > 1:
+        # if this is not the first retry, truncate over the previous
+        # job_id retry attempt suffix '_xx' (3 chars)
         retry_job_id = f"{failed_job_id[:-3]}_{retry_attempt_cnt:02}"  # pad with zero
     else:
         retry_job_id = f"{failed_job_id}_{retry_attempt_cnt:02}"  # pad with zero
@@ -222,8 +225,8 @@ def wait_on_last_job(gcs_client: storage.client, bq_client: bigquery.Client,
             google.api_core.exceptions.BadRequest) as err:
         # Retry all internal 5xx and 400 errors up to user-defined limit
         # set in MAX_RETRIES_ON_BIGQUERY_ERROR constant
-        if (isinstance(err, google.api_core.exceptions.ServerError) or
-                isinstance(err, google.api_core.exceptions.BadRequest)):
+        if isinstance(err, (google.api_core.exceptions.ServerError,
+                            google.api_core.exceptions.BadRequest)):
             retry_attempt_cnt += 1  # Increment the retry count
             if retry_attempt_cnt <= constants.MAX_RETRIES_ON_BIGQUERY_ERROR:
                 logging.log_with_table(
@@ -232,15 +235,14 @@ def wait_on_last_job(gcs_client: storage.client, bq_client: bigquery.Client,
                 retry_query(gcs_client, bq_client, lock_blob, job_id, table,
                             retry_attempt_cnt)
                 return False
-            else:
-                # Reaching this point means all retries on 5xx errors have
-                # been unsuccessful so now we'll write the error to the
-                # _bqlock file, then raise an exception.
-                utils.handle_bq_lock(gcs_client,
-                                     lock_blob,
-                                     err.message,
-                                     table,
-                                     retry_attempt_cnt=retry_attempt_cnt)
+            # Reaching this point means all retries on 5xx errors have
+            # been unsuccessful so now we'll write the error to the
+            # _bqlock file, then raise an exception.
+            utils.handle_bq_lock(gcs_client,
+                                 lock_blob,
+                                 err.message,
+                                 table,
+                                 retry_attempt_cnt=retry_attempt_cnt)
 
         raise exceptions.BigQueryJobFailure(
             f"previous BigQuery job: {job_id} failed or could not "

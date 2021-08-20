@@ -722,8 +722,8 @@ def check_for_bq_job_and_children_errors(
         # Raise any 5xx error codes
         exception: Optional[
             google.api_core.exceptions.GoogleAPICallError] = job.exception()
-        if (isinstance(exception, google.api_core.exceptions.ServerError) or
-                isinstance(exception, google.api_core.exceptions.BadRequest)):
+        if isinstance(exception, (google.api_core.exceptions.ServerError,
+                                  google.api_core.exceptions.BadRequest)):
             # Raise these two exception types so that the job can be retried
             raise exception
         raise exceptions.BigQueryJobFailure(
