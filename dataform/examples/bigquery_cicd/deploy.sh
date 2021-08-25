@@ -12,10 +12,11 @@ cleanup() {
 }
 
 generate_dataform_configs(){
-  export PROJECT_ID=$1
-  export DATASET_ID=$2
-  envsubst < dataform_dev.json > dataform.json
-  generate_dataform_credentials "${PROJECT_ID}" .
+  local project_id=$1
+  local dataset_id=$2
+  sed "s|\${PROJECT_ID}|${project_id}|g" dataform_dev.json \
+  | sed "s|\${DATASET_ID}|${dataset_id}|g" > dataform.json
+  generate_dataform_credentials "${project_id}" .
   #redirect to null to avoid noise
   dataform install > /dev/null 2>&1
 }
