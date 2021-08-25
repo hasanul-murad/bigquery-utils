@@ -57,25 +57,24 @@ copy_sql_and_rename_to_sqlx() {
 }
 
 deploy_mock_production_env() {
-  export PROJECT_ID=$1
-  export DATASET_ID=$2
-  generate_dataform_credentials "${PROJECT_ID}" create_prod_env
-  envsubst < dataform_dev.json > create_prod_env/dataform.json
+  local project_id=$1
+  local dataset_id=$2
+  generate_dataform_credentials "${project_id}" create_prod_env
+  sed "s|\${PROJECT_ID}|${project_id}|g" dataform_dev.json \
+  | sed "s|\${DATASET_ID}|${dataset_id}|g" > create_prod_env/dataform.json
   # Add sym links to Dataform configs/dependencies
   add_symbolic_dataform_dependencies create_prod_env
   dataform run create_prod_env/
 }
 
 deploy_ddls_in_test_env() {
-  export PROJECT_ID=$1
-  export DATASET_ID=$2
+  local project_id=$1
+  local dataset_id=$2
   mkdir -p create_test_env/definitions
-  generate_dataform_credentials "${PROJECT_ID}" create_test_env
-  envsubst < dataform_dev.json > create_test_env/dataform.json
+  generate_dataform_credentials "${project_id}" create_test_env
+  sed "s|\${PROJECT_ID}|${project_id}|g" dataform_dev.json \
+  | sed "s|\${DATASET_ID}|${dataset_id}|g" > create_test_env/dataform.json
   add_symbolic_dataform_dependencies create_test_env
-  # Create a mock test dataset. In real-world scenario, this will
-  # be done by Terraform. Only done here for demo.
-  bq mk --dataset dataform_test
   # Change .sql extension DDLs to .sqlx and
   # move them into Dataform definitions folder
   copy_sql_and_rename_to_sqlx source_ddls create_test_env/definitions
@@ -83,16 +82,17 @@ deploy_ddls_in_test_env() {
 }
 
 deploy_ddl_changes() {
-  export PROJECT_ID=$1
-  export DATASET_ID=$2
+  local project_id=$1
+  local dataset_id=$2
   python3 table_sync.py source_ddls \
     --output-ddl-dir=apply_table_changes/definitions \
     --test-project-id="${TEST_PROJECT_ID}" \
     --test-dataset-id="${TEST_DATASET_ID}" \
     --prod-project-id="${PROD_PROJECT_ID}" \
     --prod-dataset-id="${PROD_DATASET_ID}"
-  generate_dataform_credentials "${PROJECT_ID}" apply_table_changes
-  envsubst < dataform_dev.json > apply_table_changes/dataform.json
+  generate_dataform_credentials "${project_id}" apply_table_changes
+    sed "s|\${PROJECT_ID}|${project_id}|g" dataform_dev.json \
+  | sed "s|\${DATASET_ID}|${dataset_id}|g" > apply_table_changes/dataform.json
   add_symbolic_dataform_dependencies apply_table_changes
   dataform run apply_table_changes/
 }
