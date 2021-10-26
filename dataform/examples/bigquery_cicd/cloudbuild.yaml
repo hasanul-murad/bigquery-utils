@@ -9,8 +9,10 @@ steps:
       - run.sh
     env:
       - PROJECT_ID=${PROJECT_ID}
-      - BQ_LOCATION=US
+      - BQ_LOCATION=${_BQ_LOCATION}
       - BRANCH_NAME=${BRANCH_NAME}
       - SHORT_SHA=${SHORT_SHA}
       - _JS_BUCKET=${_JS_BUCKET}
       - _PR_NUMBER=${_PR_NUMBER}
+      - DATAFORM_ACTIONS=${_DATAFORM_ACTIONS}
+      - DATAFORM_TAGS=${_DATAFORM_TAGS}
