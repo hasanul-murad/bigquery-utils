@@ -1,5 +1,15 @@
 steps:
+  ###########################################################
+  # Build and deploy BigQuery assets
+  ###########################################################
   - name: 'dataformco/dataform'
-    args: ['install']
-  - name: 'dataformco/dataform'
-    args: ['run']
+    entrypoint: bash
+    args:
+      - run.sh
+    env:
+      - PROJECT_ID=${PROJECT_ID}
+      - BQ_LOCATION=US
+      - BRANCH_NAME=${BRANCH_NAME}
+      - SHORT_SHA=${SHORT_SHA}
+      - _JS_BUCKET=${_JS_BUCKET}
+      - _PR_NUMBER=${_PR_NUMBER}
