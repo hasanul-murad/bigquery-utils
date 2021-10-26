@@ -1,0 +1,5 @@
+steps:
+  - name: 'dataformco/dataform'
+    args: ['install']
+  - name: 'dataformco/dataform'
+    args: ['run']
