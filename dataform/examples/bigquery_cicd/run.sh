@@ -1,0 +1,2 @@
+dataform install
+dataform run

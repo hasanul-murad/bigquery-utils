@@ -1,0 +1,27 @@
+config { hasOutput: true }
+
+-- Table created for the first time
+-- CREATE TABLE IF NOT EXISTS ${self()}
+CREATE OR REPLACE TABLE ${self()}
+(
+  load_date DATE,
+  zipcode STRING NOT NULL OPTIONS(description="Five digit ZIP Code Tabulation Area Census Code"),
+  geo_id STRING OPTIONS(description="Geo code"),
+  minimum_age INT64 OPTIONS(description="The minimum age in the age range. If null, this indicates the row as a total for male, female, or overall population."),
+  maximum_age INT64 OPTIONS(description="The maximum age in the age range. If null, this indicates the row as having no maximum (such as 85 and over) or the row is a total of the male, female, or overall population."),
+  gender STRING OPTIONS(description="male or female. If empty, the row is a total population summary."),
+  population INT64 OPTIONS(description="The total count of the population for this segment."),
+)
+OPTIONS(
+  labels=[("freebqcovid", "")]
+) AS
+SELECT CURRENT_DATE() as load_date, * 
+FROM bigquery-public-data.census_bureau_usa.population_by_zip_2000;
+
+-- -- Table schema changed
+-- ALTER TABLE ${self()}
+--   ADD COLUMN IF NOT EXISTS new_column STRING OPTIONS(description="my description");
+
+-- -- Table schema changed again
+-- ALTER TABLE ${self()}
+--   ADD COLUMN IF NOT EXISTS another_new_column STRING OPTIONS(description="my description");
