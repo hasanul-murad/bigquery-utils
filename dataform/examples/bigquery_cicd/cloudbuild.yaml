@@ -3,6 +3,7 @@ steps:
   # Build and deploy BigQuery assets
   ###########################################################
   - name: 'dataformco/dataform'
+    dir: dataform/examples/bigquery_cicd
     entrypoint: bash
     args:
       - run.sh
