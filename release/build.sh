@@ -198,8 +198,7 @@ function build() {
   # Only build the BigQuery UDFs if any files in the
   # udfs/ directory have been changed
   if echo "${files_changed}" | grep -q "${UDF_DIR}"/; then
-    echo "Building BigQuery UDFs since the following files have changed:"
-    echo "${files_changed}"
+    printf "Building BigQuery UDFs since the following files have changed:\n%s\n" "${files_changed}"
     replace_js_udf_bucket_placeholder
     build_udfs
   fi
