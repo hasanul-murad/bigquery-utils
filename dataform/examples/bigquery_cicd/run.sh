@@ -3,12 +3,22 @@
 echo "{\"projectId\": \"${PROJECT_ID}\", \"location\": \"${BQ_LOCATION}\"}" > .df-credentials.json
 dataform install
 
-if [[ -n "${DATAFORM_ACTIONS}" && -n "${DATAFORM_TAGS}" ]]; then
-  dataform run --actions "${DATAFORM_ACTIONS}" --tags "${DATAFORM_TAGS}"
-elif [[ -n "${DATAFORM_ACTIONS}" ]]; then
-  dataform run --actions "${DATAFORM_ACTIONS}"
-elif [[ -n "${DATAFORM_TAGS}" ]]; then
-  dataform run --tags "${DATAFORM_TAGS}"
-else
-  dataform run
+# Need to specify a separate flag for each individual action/tag/var value ie. dataform run --tags example1 --tags example2 --tags example3
+#  https://github.com/dataform-co/dataform/issues/1200
+# The bash line below replaces all occurrences of comma
+# in $DATAFORM_TAGS with the string '--tags'
+# Bash parameter expansion is used to do this:
+#   ${parameter//find/replace}
+# https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
+all_dataform_tags=""
+if [[ -n $DATAFORM_TAGS ]]; then
+  all_dataform_tags="--tags ${DATAFORM_TAGS//,/ --tags }"
 fi
+
+all_dataform_actions=""
+if [[ -n $DATAFORM_ACTIONS ]]; then
+  all_dataform_actions="--tags ${DATAFORM_ACTIONS//,/ --tags }"
+fi
+
+dataform run "${all_dataform_tags}" "${all_dataform_actions}"
+
