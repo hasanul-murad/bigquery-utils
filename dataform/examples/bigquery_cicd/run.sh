@@ -10,16 +10,14 @@ dataform install
 # Bash parameter expansion is used to do this:
 #   ${parameter//find/replace}
 # https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
-all_dataform_tags=""
 if [[ -n $DATAFORM_TAGS ]]; then
   all_dataform_tags="--tags ${DATAFORM_TAGS//,/ --tags }"
 fi
 
-all_dataform_actions=""
 if [[ -n $DATAFORM_ACTIONS ]]; then
   all_dataform_actions="--tags ${DATAFORM_ACTIONS//,/ --tags }"
 fi
 
-printf "Running the following command:\ndataform run %s %s\n" "${all_dataform_tags}" "${all_dataform_actions}"
-dataform run "${all_dataform_tags}" "${all_dataform_actions}"
+printf "Executing the following dataform command:\ndataform run %s %s\n" "${all_dataform_tags}" "${all_dataform_actions}"
+dataform run $(echo "${all_dataform_tags}" "${all_dataform_actions}" | xargs)
 
