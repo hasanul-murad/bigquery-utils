@@ -15,7 +15,14 @@ CREATE OR REPLACE TABLE ${self()}
 OPTIONS(
   labels=[("freebqcovid", "")]
 ) AS
-SELECT CURRENT_DATE() as load_date, * 
+SELECT
+  CURRENT_DATE() as load_date,
+  zipcode,
+  geo_id,
+  minimum_age,
+  maximum_age,
+  gender,
+  population,
 FROM bigquery-public-data.census_bureau_usa.population_by_zip_2000;
 
 -- -- Table schema changed
