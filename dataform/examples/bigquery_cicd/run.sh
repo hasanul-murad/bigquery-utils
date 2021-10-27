@@ -15,7 +15,7 @@ if [[ -n $DATAFORM_TAGS ]]; then
 fi
 
 if [[ -n $DATAFORM_ACTIONS ]]; then
-  all_dataform_actions="--tags ${DATAFORM_ACTIONS//,/ --tags }"
+  all_dataform_actions="--actions ${DATAFORM_ACTIONS//,/ --tags }"
 fi
 
 printf "Executing the following dataform command:\ndataform run %s %s\n" "${all_dataform_tags}" "${all_dataform_actions}"
