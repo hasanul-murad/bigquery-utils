@@ -1,6 +1,14 @@
 #!/bin/bash
 
+if [[ "${BRANCH_NAME }" != "master" ]]; then
+  export ENV=test
+else
+  export ENV=prod
+fi
+
 echo "{\"projectId\": \"${PROJECT_ID}\", \"location\": \"${BQ_LOCATION}\"}" > .df-credentials.json
+mv "${ENV}_dataform.json" dataform.json
+
 dataform install
 
 # Need to specify a separate flag for each individual action/tag/var value ie. dataform run --tags example1 --tags example2 --tags example3
@@ -18,6 +26,10 @@ if [[ -n $DATAFORM_ACTIONS ]]; then
   all_dataform_actions="--actions ${DATAFORM_ACTIONS//,/ --tags }"
 fi
 
-printf "Executing the following dataform command:\ndataform run %s %s\n" "${all_dataform_tags}" "${all_dataform_actions}"
+printf """
+Executing the following dataform command:
+************************************************************
+dataform run %s %s
+************************************************************
+""" "${all_dataform_tags}" "${all_dataform_actions}"
 dataform run $(echo "${all_dataform_tags}" "${all_dataform_actions}" | xargs)
-

@@ -1,0 +1,6 @@
+{
+    "warehouse": "bigquery",
+    "defaultSchema": "example_dataset",
+    "defaultDatabase": "danny-bq",
+    "concurrentQueryLimit": 100
+}
