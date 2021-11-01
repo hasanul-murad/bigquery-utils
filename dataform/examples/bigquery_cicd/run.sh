@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [[ "${BRANCH_NAME }" != "master" ]]; then
+if [[ "${BRANCH_NAME}" != "master" ]]; then
   export ENV=test
 else
   export ENV=prod
