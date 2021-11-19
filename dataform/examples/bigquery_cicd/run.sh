@@ -7,7 +7,7 @@ else
 fi
 
 echo "{\"projectId\": \"${PROJECT_ID}\", \"location\": \"${BQ_LOCATION}\"}" > .df-credentials.json
-mv "${ENV}_dataform.json" dataform.json
+cp "${ENV}_dataform.json" dataform.json
 
 dataform install
 
