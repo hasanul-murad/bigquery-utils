@@ -37,7 +37,7 @@ The following sections cover a few methods of deploying the UDFs.
 ### Deploy using Cloud Shell Guided Tutorial (Recommended)
 
 **Automatic Clone**: Click below\
-   [![Open in Cloud Shell](http://gstatic.com/cloudssh/images/open-btn.svg)](https://console.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2FGoogleCloudPlatform%2Fbigquery-utils.git&cloudshell_workspace=udfs&cloudshell_tutorial=deploy_tutorial.md) \
+   [![Open in Cloud Shell](http://gstatic.com/cloudssh/images/open-btn.svg)](https://console.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fdanieldeleo%2Fbigquery-utils.git&cloudshell_workspace=udfs&cloudshell_tutorial=deploy_tutorial.md) \
    (clicking will automatically clone this repo in your Cloud Shell, open the udfs directory, and launch a tutorial to
    help you deploy all UDFs)
 
