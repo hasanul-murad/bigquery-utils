@@ -1,0 +1,52 @@
+[
+      {
+        "name": "new_col_2",
+        "type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": "The maximum age in the age range. If null, this indicates the row as having no maximum (such as 85 and over) or the row is a total of the male, female, or overall population."
+    },
+    {
+        "name": "geo_id",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Geo code"
+    },
+        
+        {
+        "name": "maximum_age",
+        "type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": "The maximum age in the age range. If null, this indicates the row as having no maximum (such as 85 and over) or the row is a total of the male, female, or overall population."
+    },
+    {
+        "name": "zipcode",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "Five digit ZIP Code Tabulation Area Census Code"
+    },
+    {
+        "name": "population",
+        "type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": "The total count of the population for this segment."
+    },
+    {
+        "name": "minimum_age",
+        "type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": "The minimum age in the age range. If null, this indicates the row as a total for male, female, or overall population."
+    },
+    
+    {
+        "name": "gender",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "male or female. If empty, the row is a total population summary."
+    },
+    {
+        "name": "new_col",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Manually added column"
+    }
+]
