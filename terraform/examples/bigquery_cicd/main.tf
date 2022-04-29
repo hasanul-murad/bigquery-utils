@@ -13,7 +13,7 @@ data "terraform_remote_state" "foo" {
   backend = "gcs"
   config = {
     bucket  = "dannybq"
-    prefix  = "test"
+    prefix  = "terraform/state"
   }
 }
 
