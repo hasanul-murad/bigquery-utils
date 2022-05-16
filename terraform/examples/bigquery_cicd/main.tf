@@ -34,34 +34,16 @@ resource "google_bigquery_dataset_iam_binding" "reader" {
   ]
 }
 
-resource "google_bigquery_table" "foo" {
+module "tables" {
+  source = "./tables"
   dataset_id = google_bigquery_dataset.example_dataset.dataset_id
-  table_id   = "foo"
-  clustering = [
-    "zipcode",
-    "population"
-  ]
-  schema = file("${path.module}/schema.json")
 }
 
-resource "google_bigquery_table" "view1" {
+module "views" {
+  source = "./views"
   dataset_id = google_bigquery_dataset.example_dataset.dataset_id
-  table_id   = "view1"
-  view {
-    use_legacy_sql = false
-    query          = file("${path.module}/views/view1.sql")
-  }
 }
 
-resource "google_bigquery_table" "view2" {
-  depends_on = [google_bigquery_table.view1, ]
-  dataset_id = google_bigquery_dataset.example_dataset.dataset_id
-  table_id   = "view2"
-  view {
-    use_legacy_sql = false
-    query          = templatefile("${path.module}/views/view2.sql", { dataset_id = var.dataset_id })
-  }
-}
 
 resource "google_service_account" "service_account" {
   account_id = "scheduler-srvc-acct"
