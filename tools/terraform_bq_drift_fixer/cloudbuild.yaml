@@ -1,0 +1,8 @@
+steps:
+  - name: alpine/terragrunt
+    entrypoint: bash
+    args:
+      - envs/deploy.sh
+      - qa
+
+
