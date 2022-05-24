@@ -1,0 +1,17 @@
+[
+  {
+    "description": "column 1",
+    "name": "col1",
+    "type": "STRING"
+  },
+  {
+    "description": "column 2",
+    "name": "col2",
+    "type": "STRING"
+  },
+  {
+    "description": "column 3",
+    "name": "col3",
+    "type": "STRING"
+  }
+]
