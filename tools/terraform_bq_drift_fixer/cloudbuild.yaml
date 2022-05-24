@@ -4,6 +4,6 @@ steps:
     dir: tools/terraform_bq_drift_fixer
     args:
       - envs/deploy.sh
-      - qa
+      - envs/qa
 
 
