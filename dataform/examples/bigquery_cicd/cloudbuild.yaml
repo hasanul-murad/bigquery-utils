@@ -8,7 +8,5 @@ steps:
     args:
       - run.sh
     env:
-      - PROJECT_ID=gcptraining-17042017
+      - PROJECT_ID=devops-323815
       - BQ_LOCATION=US
-      - DATAFORM_ACTIONS=${_DATAFORM_ACTIONS}
-      - DATAFORM_TAGS=${_DATAFORM_TAGS}
