@@ -1,6 +1,6 @@
 {
     "warehouse": "bigquery",
-    "defaultSchema": "example_dataset",
-    "defaultDatabase": "danny-bq",
+    "defaultSchema": "bq_cicd",
+    "defaultDatabase": "gcptraining-17042017",
     "concurrentQueryLimit": 100
 }
