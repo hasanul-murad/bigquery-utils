@@ -1,6 +1,6 @@
 {
     "warehouse": "bigquery",
-    "defaultSchema": "bq_cicd",
-    "defaultDatabase": "gcptraining-17042017",
+    "defaultSchema": "baseball",
+    "defaultDatabase": "devops-323815",
     "concurrentQueryLimit": 100
 }
