@@ -1,6 +1,6 @@
 {
     "warehouse": "bigquery",
-    "defaultSchema": "baseball",
+    "defaultSchema": "devops-323815.baseball",
     "defaultDatabase": "devops-323815",
     "concurrentQueryLimit": 100
 }
