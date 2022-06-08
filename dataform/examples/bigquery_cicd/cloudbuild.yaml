@@ -10,3 +10,5 @@ steps:
     env:
       - PROJECT_ID=gcptraining-17042017
       - BQ_LOCATION=US
+      - DATAFORM_ACTIONS=${_DATAFORM_ACTIONS}
+      - DATAFORM_TAGS=${_DATAFORM_TAGS}
